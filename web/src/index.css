@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gym-dark text-slate-100 font-sans tracking-wide antialiased min-h-screen overflow-x-hidden;
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-gym-card/70 backdrop-blur-md border border-white/10 shadow-xl;
+  }
+}
