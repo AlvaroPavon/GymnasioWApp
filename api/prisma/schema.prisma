@@ -19,13 +19,15 @@ enum ReservationStatus {
 }
 
 model User {
-  id            Int           @id @default(autoincrement())
-  name          String
-  email         String        @unique
-  password_hash String
-  role          Role          @default(CLIENT)
-  created_at    DateTime      @default(now())
-  updated_at    DateTime      @updatedAt
+  id              Int           @id @default(autoincrement())
+  name            String
+  email           String        @unique
+  password_hash   String
+  role            Role          @default(CLIENT)
+  profile_picture String?       @db.Text
+  phone           String?
+  created_at      DateTime      @default(now())
+  updated_at      DateTime      @updatedAt
 
   classes_taught Class[]      @relation("TeacherClasses")
   reservations   Reservation[]
@@ -41,6 +43,7 @@ model Class {
   max_capacity   Int
   start_time     DateTime
   end_time       DateTime
+  image_url      String?       @db.Text
   created_at     DateTime      @default(now())
   updated_at     DateTime      @updatedAt
 
@@ -63,4 +66,22 @@ model Reservation {
 
   @@unique([user_id, class_id]) // Evita que un usuario reserve dos veces la misma clase
   @@map("reservations")
+}
+
+model ImageBank {
+  id         Int      @id @default(autoincrement())
+  keyword    String   @unique
+  image_url  String   @db.Text
+  created_at DateTime @default(now())
+
+  @@map("image_bank")
+}
+
+model SystemSettings {
+  id         Int      @id @default(1)
+  app_name   String   @default("GymSystem Pro")
+  hero_image String?  @db.Text
+  updated_at DateTime @default(now()) @updatedAt
+
+  @@map("system_settings")
 }

@@ -4,12 +4,39 @@
 
 @layer base {
   body {
-    @apply bg-gym-dark text-slate-100 font-sans tracking-wide antialiased min-h-screen overflow-x-hidden;
+    @apply bg-slate-950 text-slate-100 font-sans tracking-wide antialiased min-h-screen overflow-x-hidden;
+    /* Subtle radial gradient background */
+    background-image: radial-gradient(circle at top right, rgba(59, 130, 246, 0.1), transparent 400px),
+                      radial-gradient(circle at bottom left, rgba(16, 185, 129, 0.05), transparent 400px);
+    background-attachment: fixed;
+  }
+
+  /* Custom Scrollbar Premium */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-slate-700/50 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-500/80;
   }
 }
 
 @layer utilities {
   .glass {
-    @apply bg-gym-card/70 backdrop-blur-md border border-white/10 shadow-xl;
+    @apply bg-slate-900/60 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)];
+  }
+  
+  .glass-hover {
+    @apply transition-all duration-300 hover:bg-slate-800/80 hover:border-white/20 hover:shadow-[0_8px_32px_rgba(59,130,246,0.15)];
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400;
   }
 }

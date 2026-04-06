@@ -2,32 +2,17 @@ import { prisma } from '../lib/prisma.js';
 
 export const getClasses = async (req, res) => {
   try {
-    const { role, id } = req.user;
-    let classes;
-
-    if (role === 'ADMIN' || role === 'CLIENT') {
-      // Admin y cliente ven todas
-      classes = await prisma.class.findMany({
-        include: {
-          teacher: { select: { id: true, name: true } },
-          _count: { select: { reservations: { where: { status: 'CONFIRMED' } } } }
+    const classes = await prisma.class.findMany({
+      include: {
+        teacher: { select: { id: true, name: true, email: true, profile_picture: true, phone: true } },
+        _count: { select: { reservations: { where: { status: 'CONFIRMED' } } } },
+        reservations: {
+          where: { status: 'CONFIRMED' },
+          include: { user: { select: { id: true, name: true, email: true, profile_picture: true, phone: true } } }
         }
-      });
-    } else if (role === 'TEACHER') {
-      // Profesor solo ve las suyas
-      classes = await prisma.class.findMany({
-        where: { teacher_id: id },
-        include: {
-          teacher: { select: { id: true, name: true } },
-          reservations: {
-            where: { status: 'CONFIRMED' },
-            include: { user: { select: { id: true, name: true, email: true } } }
-          },
-          _count: { select: { reservations: { where: { status: 'CONFIRMED' } } } }
-        }
-      });
-    }
-
+      },
+      orderBy: { start_time: 'asc' }
+    });
     res.json(classes);
   } catch (error) {
     res.status(500).json({ message: 'Error obteniendo clases', error: error.message });
@@ -38,10 +23,36 @@ export const createClass = async (req, res) => {
   try {
     const { title, description, teacher_id, max_capacity, start_time, end_time } = req.body;
     
-    // Validación extra: el teacher_id debe ser un TEACHER
-    const teacher = await prisma.user.findUnique({ where: { id: teacher_id } });
-    if (!teacher || teacher.role !== 'TEACHER') {
-      return res.status(400).json({ message: 'El ID proporcionado no corresponde a un profesor válido' });
+    // Auto-asignar foto de clase
+    const titleLower = title.toLowerCase();
+    const banks = await prisma.imageBank.findMany();
+    let assignedImageUrl = null;
+
+    for (const bank of banks) {
+      if (titleLower.includes(bank.keyword)) {
+        assignedImageUrl = bank.image_url;
+        break; // Match found
+      }
+    }
+
+    // Default estetica gym si no matchea
+    if(!assignedImageUrl) {
+      assignedImageUrl = "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=1000";
+    }
+
+    const start = new Date(start_time);
+    const end = new Date(end_time);
+
+    // Validación de solapamiento
+    const overlappingClass = await prisma.class.findFirst({
+      where: {
+        start_time: { lt: end },
+        end_time: { gt: start }
+      }
+    });
+
+    if (overlappingClass) {
+      return res.status(400).json({ message: 'Ya existe una clase programada que coincide en este horario.' });
     }
 
     const newClass = await prisma.class.create({
@@ -51,7 +62,8 @@ export const createClass = async (req, res) => {
         teacher_id,
         max_capacity,
         start_time: new Date(start_time),
-        end_time: new Date(end_time)
+        end_time: new Date(end_time),
+        image_url: assignedImageUrl
       }
     });
 
@@ -134,29 +146,90 @@ export const reserveClass = async (req, res) => {
 
 export const cancelReservation = async (req, res) => {
   try {
-    const { id: classId } = req.params;
-    const userId = req.user.id;
-
-    const reservation = await prisma.reservation.findUnique({
-      where: {
-        user_id_class_id: {
-          user_id: userId,
-          class_id: Number(classId)
-        }
-      }
+    const { id } = req.params; // ID de la clase
+    
+    // Ignoramos el status en la busqueda, si existe la fila para ese user/class, se puede borrar
+    const reservation = await prisma.reservation.findFirst({
+      where: { class_id: Number(id), user_id: req.user.id }
     });
 
     if (!reservation) {
-      return res.status(400).json({ message: 'No tienes una reserva en esta clase' });
+      return res.status(404).json({ message: 'No hay reserva activa' });
     }
 
-    await prisma.reservation.update({
-      where: { id: reservation.id },
-      data: { status: 'CANCELLED' }
+    // ELIMINACION REAL para limpiar el constraints y liberar el "isReservedByMe"
+    await prisma.reservation.delete({
+      where: { id: reservation.id }
     });
 
-    res.status(200).json({ message: 'Reserva cancelada' });
+    res.status(200).json({ message: 'Reserva cancelada y borrada' });
   } catch (error) {
     res.status(500).json({ message: 'Error cancelando reserva', error: error.message });
+  }
+};
+
+// EDITAR UNA CLASE
+export const updateClass = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, teacher_id, max_capacity, start_time, end_time } = req.body;
+
+    const existingClass = await prisma.class.findUnique({ where: { id: Number(id) } });
+    if (!existingClass) return res.status(404).json({ message: 'Clase no encontrada' });
+
+    // Autorización estricta: Si es TEACHER, debe ser SU clase.
+    if (req.user.role === 'TEACHER' && existingClass.teacher_id !== req.user.id) {
+      return res.status(403).json({ message: 'No tienes permiso para editar clases de otros profesores.' });
+    }
+
+    const data = {};
+    if (title) data.title = title;
+    if (max_capacity) data.max_capacity = Number(max_capacity);
+    
+    const start = start_time ? new Date(start_time) : existingClass.start_time;
+    const end = end_time ? new Date(end_time) : existingClass.end_time;
+    
+    if (start_time) data.start_time = start;
+    if (end_time) data.end_time = end;
+    
+    // Validación de solapamiento al editar
+    const overlappingClass = await prisma.class.findFirst({
+      where: {
+        id: { not: Number(id) },
+        start_time: { lt: end },
+        end_time: { gt: start }
+      }
+    });
+
+    if (overlappingClass) {
+      return res.status(400).json({ message: 'El nuevo horario se solapa con una clase existente.' });
+    }
+    
+    // Solo un ADMIN puede cambiar al profesor de una clase
+    if (teacher_id && req.user.role === 'ADMIN') {
+      data.teacher_id = Number(teacher_id);
+    }
+
+    const updated = await prisma.class.update({
+      where: { id: Number(id) },
+      data
+    });
+
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ message: 'Error editando clase', error: error.message });
+  }
+};
+
+export const deleteClass = async (req, res) => {
+  try {
+    const { id } = req.params;
+    // Eliminar reservas asociadas primero (manejo de constraint)
+    await prisma.reservation.deleteMany({ where: { class_id: Number(id) }});
+    // Eliminar clase
+    await prisma.class.delete({ where: { id: Number(id) }});
+    res.json({ message: 'Clase eliminada correctamente' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error al eliminar clase', error: error.message });
   }
 };
