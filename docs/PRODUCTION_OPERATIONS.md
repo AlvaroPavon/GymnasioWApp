@@ -62,7 +62,7 @@ Con las escrituras detenidas, guardar estas evidencias fuera del directorio del 
 ```sql
 SELECT TABLE_NAME
 FROM information_schema.TABLES
-WHERE TABLE_SCHEMA = 'gimnasio' AND TABLE_TYPE = 'BASE TABLE'
+WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE'
 ORDER BY TABLE_NAME;
 
 SELECT id, email,
@@ -82,14 +82,29 @@ Para cada nombre devuelto por la primera consulta, registrar `SELECT COUNT(*) FR
 Usar credenciales desde un archivo protegido, no desde el historial del shell:
 
 ```bash
+umask 077
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+partial="gimnasiowapp-${stamp}.sql.partial"
+final="gimnasiowapp-${stamp}.sql.gz"
 mysqldump --defaults-extra-file=/root/.my.cnf \
-  --single-transaction --routines --triggers --events --hex-blob \
-  gimnasio > "gimnasio-${stamp}.sql"
-sha256sum "gimnasio-${stamp}.sql" > "gimnasio-${stamp}.sql.sha256"
-test -s "gimnasio-${stamp}.sql"
-sha256sum -c "gimnasio-${stamp}.sql.sha256"
+  --single-transaction --quick --skip-lock-tables \
+  --no-tablespaces --set-gtid-purged=OFF --hex-blob --triggers \
+  gimnasiowapp > "$partial"
+test -s "$partial"
+gzip -9 -c "$partial" > "${final}.partial"
+gzip -t "${final}.partial"
+mv "${final}.partial" "$final"
+rm -f "$partial"
+sha256sum "$final" > "${final}.sha256"
+sha256sum -c "${final}.sha256"
 ```
+
+`--no-tablespaces` evita exigir el privilegio global `PROCESS`. Antes del
+volcado hay que confirmar que todas las tablas son InnoDB y comprobar si
+existen rutinas o eventos; sus flags solo se añaden cuando existen y el usuario
+de backup dispone de los privilegios correspondientes. Un archivo `.partial`
+procedente de un comando fallido se marca como `.FAILED` y nunca se considera
+restaurable.
 
 Restaurar ese dump en una base aislada, ejecutar `mysqlcheck` sobre la restauración y repetir allí los conteos y fingerprints. El backup no se considera verificado hasta que la restauración coincide con las evidencias previas.
 
