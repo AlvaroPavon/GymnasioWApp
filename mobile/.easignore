@@ -1,0 +1,28 @@
+node_modules/
+dist/
+.deploy/
+.expo/
+coverage/
+store/
+*.log
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# The Android production profile uses credentialsSource=local, so EAS needs
+# credentials.json and the referenced upload-key JKS. Exclude every unrelated
+# credential or backup so it cannot enter the cloud build archive.
+credentials/*.secrets.json
+credentials/*.pem
+credentials/*.p8
+credentials/*.p12
+credentials/*.pfx
+credentials/*.mobileprovision
+google-services.json
+GoogleService-Info.plist
+google-service-account*.json
+service-account*.json

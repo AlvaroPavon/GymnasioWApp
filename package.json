@@ -1,0 +1,36 @@
+{
+  "name": "gimnasiowapp",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "api",
+    "web",
+    "mobile"
+  ],
+  "scripts": {
+    "api:dev": "npm -w api run dev",
+    "api:test": "npm -w api run test",
+    "api:generate": "npm -w api run prisma:generate",
+    "api:migrate": "npm -w api run prisma:migrate:deploy",
+    "web:dev": "npm -w web run dev",
+    "mobile:start": "npm -w mobile run start",
+    "mobile:export:android": "npm -w mobile run export:android",
+    "mobile:export:ios": "npm -w mobile run export:ios",
+    "mobile:release:check": "npm -w mobile run release:check",
+    "mobile:release:check:android": "npm -w mobile run release:check:android",
+    "mobile:build:android": "npm -w mobile run build:android",
+    "mobile:build:ios": "npm -w mobile run build:ios",
+    "mobile:submit:android": "npm -w mobile run submit:android",
+    "mobile:submit:ios": "npm -w mobile run submit:ios"
+  },
+  "engines": {
+    "node": ">=20.19"
+  },
+  "overrides": {
+    "uuid": "11.1.1",
+    "@hono/node-server": "1.19.13",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native-safe-area-context": "5.7.0"
+  }
+}

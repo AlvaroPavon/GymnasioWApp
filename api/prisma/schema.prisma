@@ -1,0 +1,197 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  TEACHER
+  CLIENT
+}
+
+enum MonthlyStatus {
+  PAGADO
+  IMPAGADO
+}
+
+enum Platform {
+  IOS
+  ANDROID
+}
+
+enum ReservationStatus {
+  CONFIRMADA
+  EN_ESPERA
+  ASISTENCIA_VALIDADA
+  NO_ASISTE
+  CANCELADA
+}
+
+enum MembershipPaymentStatus {
+  PENDING_ADMIN_REVIEW
+  CONFIRMED
+  REJECTED
+}
+
+enum AdminNotificationType {
+  PAYMENT_REPORTED
+  MEMBERSHIP_EXPIRED
+}
+
+model User {
+  id                  Int           @id @default(autoincrement()) @map("id")
+  name                String        @map("nombre") @db.VarChar(120)
+  email               String        @unique(map: "uq_usuarios_email") @map("email") @db.VarChar(191)
+  passwordHash        String        @map("password_hash") @db.VarChar(255)
+  role                Role          @map("rol")
+  monthlyStatus       MonthlyStatus @default(IMPAGADO) @map("estado_mensualidad")
+  membershipExpiresAt DateTime?     @map("membership_expires_at") @db.DateTime(3)
+  phone               String?       @map("telefono") @db.VarChar(30)
+  profilePicture      String?       @map("profile_picture") @db.Text
+
+  pushDevices   PushDevice[]
+  classesTaught GymClass[]    @relation("TeacherClasses")
+  reservations  Reservation[]
+  penalties     Penalty[]
+  membershipPayments MembershipPayment[] @relation("MembershipPaymentUser")
+  reviewedMembershipPayments MembershipPayment[] @relation("MembershipPaymentReviewer")
+  adminNotifications AdminNotification[]
+
+  @@map("Usuarios")
+}
+
+model PushDevice {
+  id        Int      @id @default(autoincrement()) @map("id")
+  userId    Int      @map("user_id")
+  pushToken String   @unique(map: "uq_dispositivos_push_token") @map("push_token") @db.VarChar(191)
+  platform  Platform @map("plataforma")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_dispositivos_user_id")
+  @@map("DispositivosPush")
+}
+
+model ClassType {
+  id       Int     @id @default(autoincrement()) @map("id")
+  name     String  @unique(map: "uq_tipos_clase_nombre") @map("nombre") @db.VarChar(80)
+  imageUrl String? @map("image_url") @db.Text
+
+  classes   GymClass[]
+  penalties Penalty[]
+
+  @@map("TiposClase")
+}
+
+model GymClass {
+  id          Int      @id @default(autoincrement()) @map("id")
+  title       String   @map("titulo") @db.VarChar(140)
+  description String?  @map("descripcion") @db.Text
+  classTypeId Int      @map("tipo_clase_id")
+  teacherId   Int      @map("teacher_id")
+  maxCapacity Int      @map("capacidad_maxima")
+  startsAt    DateTime @map("fecha_hora_inicio") @db.DateTime(3)
+  endsAt      DateTime @map("fecha_hora_fin") @db.DateTime(3)
+  imageUrl    String?  @map("image_url") @db.Text
+
+  classType    ClassType     @relation(fields: [classTypeId], references: [id], onDelete: Restrict)
+  teacher      User          @relation("TeacherClasses", fields: [teacherId], references: [id], onDelete: Restrict)
+  reservations Reservation[]
+
+  @@index([classTypeId], map: "idx_clases_tipo_clase_id")
+  @@index([teacherId], map: "idx_clases_teacher_id")
+  @@index([startsAt], map: "idx_clases_fecha_inicio")
+  @@map("Clases")
+}
+
+model Reservation {
+  id          Int               @id @default(autoincrement()) @map("id")
+  userId      Int               @map("user_id")
+  classId     Int               @map("clase_id")
+  status      ReservationStatus @map("estado")
+  requestedAt DateTime          @default(now()) @map("fecha_solicitud") @db.Timestamp(3)
+  promotedAt  DateTime?         @map("promovida_en") @db.DateTime(3)
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gymClass GymClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, classId], map: "uq_reservas_user_clase")
+  @@index([classId, status, requestedAt], map: "idx_reservas_clase_estado_fecha")
+  @@index([userId], map: "idx_reservas_user_id")
+  @@map("Reservas")
+}
+
+model Penalty {
+  id          Int     @id @default(autoincrement()) @map("id")
+  userId      Int     @map("user_id")
+  classTypeId Int     @map("tipo_clase_id")
+  active      Boolean @default(true) @map("activa")
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  classType ClassType @relation(fields: [classTypeId], references: [id], onDelete: Cascade)
+
+  @@index([userId, classTypeId, active], map: "idx_penalizaciones_user_tipo_activa")
+  @@map("Penalizaciones")
+}
+
+
+model ImageBank {
+  id        Int      @id @default(autoincrement()) @map("id")
+  keyword   String   @unique(map: "uq_image_bank_keyword") @map("keyword") @db.VarChar(120)
+  imageUrl  String   @map("image_url") @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(3)
+
+  @@map("ImageBank")
+}
+
+model SystemSettings {
+  id        Int      @id @default(1) @map("id")
+  appName   String   @default("Ronquillo Te Cuida") @map("app_name") @db.VarChar(120)
+  heroImage String?  @map("hero_image") @db.Text
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(3)
+
+  @@map("SystemSettings")
+}
+
+model MembershipPayment {
+  id           Int                     @id @default(autoincrement()) @map("id")
+  userId       Int                     @map("user_id")
+  amountCents  Int?                    @map("amount_cents")
+  status       MembershipPaymentStatus @default(PENDING_ADMIN_REVIEW) @map("status")
+  paidAt       DateTime                @default(now()) @map("paid_at") @db.DateTime(3)
+  reviewedById Int?                    @map("reviewed_by_id")
+  reviewedAt   DateTime?               @map("reviewed_at") @db.DateTime(3)
+  notes        String?                 @map("notes") @db.Text
+  createdAt    DateTime                @default(now()) @map("created_at") @db.Timestamp(3)
+
+  user          User                @relation("MembershipPaymentUser", fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy    User?               @relation("MembershipPaymentReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  notifications AdminNotification[]
+
+  @@index([userId, status], map: "idx_pagos_user_status")
+  @@index([status, createdAt], map: "idx_pagos_status_created")
+  @@map("PagosMensualidad")
+}
+
+model AdminNotification {
+  id        Int                   @id @default(autoincrement()) @map("id")
+  type      AdminNotificationType @map("type")
+  title     String                @map("title") @db.VarChar(160)
+  message   String                @map("message") @db.Text
+  userId    Int?                  @map("user_id")
+  paymentId Int?                  @map("payment_id")
+  readAt    DateTime?             @map("read_at") @db.DateTime(3)
+  createdAt DateTime              @default(now()) @map("created_at") @db.Timestamp(3)
+
+  user    User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  payment MembershipPayment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  @@index([readAt, createdAt], map: "idx_notificaciones_read_created")
+  @@index([type, createdAt], map: "idx_notificaciones_type_created")
+  @@map("NotificacionesAdmin")
+}

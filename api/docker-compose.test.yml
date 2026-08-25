@@ -1,0 +1,22 @@
+name: gimnasiowapp-api-test
+
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: test-root-local-only
+      MYSQL_DATABASE: gimnasio_test
+      MYSQL_USER: gimnasio
+      MYSQL_PASSWORD: gimnasio
+    ports:
+      - "127.0.0.1:3307:3306"
+    command: ["mysqld", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_PASSWORD mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER --silent"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    restart: "no"

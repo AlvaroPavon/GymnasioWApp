@@ -1,0 +1,73 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: gimnasiowapp-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: gimnasio
+      MYSQL_USER: gimnasio
+      MYSQL_PASSWORD: gimnasio
+    ports:
+      - "3306:3306"
+    command: ["mysqld", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-ugimnasio", "-pgimnasio"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    profiles: ["api"]
+    image: node:20-bookworm-slim
+    container_name: gimnasiowapp-api
+    restart: unless-stopped
+    init: true
+    working_dir: /workspace
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      HOST: 0.0.0.0
+      DATABASE_URL: mysql://gimnasio:gimnasio@mysql:3306/gimnasio
+      JWT_SECRET: ${JWT_SECRET:-local_docker_only_replace_with_32_chars_minimum}
+      JWT_EXPIRES_IN: 8h
+      BCRYPT_COST: 12
+      CORS_ORIGIN: http://localhost:5173
+      PUBLIC_BASE_URL: http://localhost:3000
+      CRON_ENABLED: "true"
+    ports:
+      - "3000:3000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
+        mkdir -p /workspace/api/uploads/class-types
+        cp -n /bundled-class-types/* /workspace/api/uploads/class-types/
+        npm ci
+        npm -w api run prisma:generate
+        cd /workspace/api
+        exec npm run dev
+    volumes:
+      - .:/workspace
+      - api_node_modules:/workspace/node_modules
+      - api_prisma_generated:/workspace/api/src/generated/prisma
+      - api_uploads:/workspace/api/uploads
+      - ./api/uploads/class-types:/bundled-class-types:ro
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  mysql_data:
+  api_uploads:
+  api_node_modules:
+  api_prisma_generated:
