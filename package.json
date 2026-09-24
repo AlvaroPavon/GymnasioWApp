@@ -24,13 +24,26 @@
     "mobile:submit:ios": "npm -w mobile run submit:ios"
   },
   "engines": {
-    "node": ">=20.19"
+    "node": ">=22.12 <25"
   },
   "overrides": {
     "uuid": "11.1.1",
     "@hono/node-server": "1.19.13",
+    "@prisma/config": {
+      "deepmerge-ts": "8.0.2"
+    },
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native-safe-area-context": "5.7.0"
+  },
+  "devDependencies": {
+    "body-parser": "^2.3.0",
+    "esbuild": "^0.28.2",
+    "ip-address": "^10.7.2",
+    "nanoid": "^3.3.18",
+    "postcss": "^8.5.28",
+    "qs": "^6.16.0",
+    "undici": "^7.29.1",
+    "vite": "^8.3.0"
   }
 }

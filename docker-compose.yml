@@ -9,7 +9,7 @@ services:
       MYSQL_USER: gimnasio
       MYSQL_PASSWORD: gimnasio
     ports:
-      - "3306:3306"
+      - "127.0.0.1:3308:3306"
     command: ["mysqld", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
     volumes:
       - mysql_data:/var/lib/mysql
@@ -22,7 +22,10 @@ services:
 
   api:
     profiles: ["api"]
-    image: node:20-bookworm-slim
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    image: gimnasiowapp-api-runtime:node24.21
     container_name: gimnasiowapp-api
     restart: unless-stopped
     init: true
