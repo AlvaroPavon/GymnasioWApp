@@ -38,6 +38,23 @@ export function withExplicitImageOverride(payload, { isEditing, value, originalV
 export const statusOf = (user) => user?.estado_mensualidad || user?.monthlyStatus || 'IMPAGADO';
 export const expiryOf = (user) => user?.membership_expires_at || user?.membershipExpiresAt;
 export const reservationStatus = (reservation) => reservation?.status || reservation?.estado;
+export const reservationHidesName = (reservation) => (
+  reservation?.hideName
+  ?? reservation?.hide_name
+  ?? reservation?.ocultar_nombre
+  ?? false
+);
+export const reservationIsFixed = (reservation) => (
+  reservation?.fixedEnrollment
+  ?? reservation?.fixed_enrollment
+  ?? reservation?.inscripcion_fija
+  ?? false
+);
+export const classReminderEnabled = (user) => (
+  user?.classReminderEnabled
+  ?? user?.class_reminder_enabled
+  ?? false
+);
 
 export const canViewParticipantIdentities = (role) => role === 'ADMIN' || role === 'TEACHER';
 
@@ -92,7 +109,7 @@ export const canValidate = (reservation, startsAtValue, now = new Date()) => {
 
   const promotedAt = timestampOf(promotedAtOf(reservation));
   return Number.isFinite(promotedAt)
-    && promotedAt > startsAt - ATTENDANCE_CUTOFF_MS
+    && promotedAt >= startsAt - ATTENDANCE_CUTOFF_MS
     && promotedAt < startsAt;
 };
 

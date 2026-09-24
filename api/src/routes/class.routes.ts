@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
+import { addWeeks } from "date-fns";
 import { prisma } from "../db/prisma.js";
 import { AppError } from "../errors/AppError.js";
 import { Prisma } from "../generated/prisma/client.js";
@@ -16,7 +17,18 @@ const visibleReservationStatuses = ["CONFIRMADA", "ASISTENCIA_VALIDADA", "EN_ESP
 const occupyingReservationStatuses = ["CONFIRMADA", "ASISTENCIA_VALIDADA"] as const;
 
 const idParams = z.object({ id: z.coerce.number().int().positive() }).strict();
-const isoOrLocalDate = z.string().min(10).transform((value) => new Date(value));
+const reserveBody = z.preprocess(
+  (value) => value ?? {},
+  z.object({
+    hideName: z.boolean().optional(),
+    hide_name: z.boolean().optional(),
+    ocultar_nombre: z.boolean().optional()
+  }).strict()
+);
+const isoOrLocalDate = z.string()
+  .min(10)
+  .transform((value) => new Date(value))
+  .refine((value) => Number.isFinite(value.getTime()), "Invalid class date-time");
 const explicitImageOverride = z.preprocess(
   (value) => value === "" ? null : value,
   z.string().url().nullable().optional()
@@ -40,7 +52,11 @@ const classBody = z.object({
   imageUrl: z.string().url().optional(),
   image_url: z.string().url().optional(),
   imageOverrideUrl: explicitImageOverride,
-  image_override_url: explicitImageOverride
+  image_override_url: explicitImageOverride,
+  repeatWeeks: z.coerce.number().int().min(1).max(52).optional(),
+  repeat_weeks: z.coerce.number().int().min(1).max(52).optional(),
+  fixedUserIds: z.array(z.coerce.number().int().positive()).max(500).optional(),
+  fixed_user_ids: z.array(z.coerce.number().int().positive()).max(500).optional()
 }).passthrough();
 
 async function defaultClassTypeId() {
@@ -66,7 +82,21 @@ function normalizeClassBody(body: z.infer<typeof classBody>) {
     ? Object.hasOwn(body, "imageOverrideUrl") ? body.imageOverrideUrl : body.image_override_url
     : body.imageUrl ?? body.image_url;
   const imageInput = explicitOverrideProvided ? "explicit" : legacyImageProvided ? "legacy" : "none";
-  return { title, description, classTypeId, teacherId, maxCapacity, startsAt, endsAt, imageOverrideUrl, imageInput };
+  const repeatWeeks = body.repeatWeeks ?? body.repeat_weeks ?? 1;
+  const fixedUserIds = [...new Set(body.fixedUserIds ?? body.fixed_user_ids ?? [])];
+  return {
+    title,
+    description,
+    classTypeId,
+    teacherId,
+    maxCapacity,
+    startsAt,
+    endsAt,
+    imageOverrideUrl,
+    imageInput,
+    repeatWeeks,
+    fixedUserIds
+  };
 }
 
 async function assertTeacher(teacherId: number) {
@@ -87,13 +117,20 @@ function loadClassImageSources() {
 
 router.get("/", authenticate, asyncHandler(async (req, res) => {
   if (!req.auth) throw new AppError(401, "AUTH_REQUIRED", "Authentication is required");
-  const viewerRole = req.auth.role;
+  const auth = req.auth;
+  const viewerRole = auth.role;
   const reservationWhere = viewerRole === "CLIENT"
-    ? { status: { in: [...visibleReservationStatuses] }, userId: req.auth.userId }
+    ? {
+        status: { in: [...visibleReservationStatuses] },
+        OR: [
+          { userId: auth.userId },
+          { status: { in: [...occupyingReservationStatuses] } }
+        ]
+      }
     : { status: { in: [...visibleReservationStatuses] } };
   const [classes, [classTypeImages, imageBank]] = await Promise.all([
     prisma.gymClass.findMany({
-      where: viewerRole === "TEACHER" ? { teacherId: req.auth.userId } : undefined,
+      where: viewerRole === "TEACHER" ? { teacherId: auth.userId } : undefined,
       orderBy: { startsAt: "asc" },
       include: {
         classType: true,
@@ -115,47 +152,114 @@ router.get("/", authenticate, asyncHandler(async (req, res) => {
   res.json(classes.map((gymClass) => classDto(gymClass, {
     effectiveImageUrl: effectiveClassImage(gymClass, classTypeImages, imageBank),
     absoluteUrl: (value) => absolutePublicUrl(req, value),
-    viewerRole
+    viewerRole,
+    viewerUserId: auth.userId
   })));
 }));
 
 router.post("/", authenticate, requireRoles("ADMIN", "TEACHER"), validate({ body: classBody }), asyncHandler(async (req, res) => {
   if (!req.auth) throw new AppError(401, "AUTH_REQUIRED", "Authentication is required");
+  const auth = req.auth;
   const data = normalizeClassBody(req.body);
-  if (!data.title || !data.maxCapacity || !data.startsAt || !data.endsAt) {
+  const { title, maxCapacity, startsAt, endsAt } = data;
+  if (!title || !maxCapacity || !startsAt || !endsAt) {
     throw new AppError(400, "INVALID_CLASS_PAYLOAD", "title, maxCapacity, startsAt and endsAt are required");
   }
-  if (data.endsAt <= data.startsAt) throw new AppError(400, "INVALID_CLASS_DATES", "Class end time must be after start time");
+  if (endsAt <= startsAt) throw new AppError(400, "INVALID_CLASS_DATES", "Class end time must be after start time");
 
-  const teacherId = req.auth.role === "TEACHER" ? req.auth.userId : data.teacherId;
+  const teacherId = auth.role === "TEACHER" ? auth.userId : data.teacherId;
   if (!teacherId) throw new AppError(400, "TEACHER_REQUIRED", "teacherId is required when an admin creates a class");
   await assertTeacher(teacherId);
 
-  const gymClass = await prisma.gymClass.create({
-    data: {
-      title: data.title,
-      description: data.description,
-      classTypeId: data.classTypeId ?? await defaultClassTypeId(),
-      teacherId,
-      maxCapacity: data.maxCapacity,
-      startsAt: data.startsAt,
-      endsAt: data.endsAt,
-      imageUrl: data.imageOverrideUrl
-    },
-    include: {
-      classType: true,
-      teacher: true,
-      reservations: { where: { status: { in: [...visibleReservationStatuses] } }, include: { user: true } },
-      _count: { select: { reservations: { where: { status: { in: [...occupyingReservationStatuses] } } } } }
+  if (data.fixedUserIds.length > maxCapacity) {
+    throw new AppError(409, "FIXED_USERS_EXCEED_CAPACITY", "Fixed users cannot exceed class capacity");
+  }
+
+  const classTypeId = data.classTypeId ?? await defaultClassTypeId();
+  const now = new Date();
+  const classes = await prisma.$transaction(async (tx) => {
+    if (data.fixedUserIds.length > 0) {
+      const eligibleUsers = await tx.user.findMany({
+        where: {
+          id: { in: data.fixedUserIds },
+          role: "CLIENT",
+          monthlyStatus: "PAGADO",
+          membershipExpiresAt: { gt: now }
+        },
+        select: { id: true }
+      });
+      const eligibleIds = new Set(eligibleUsers.map((user) => user.id));
+      const ineligibleUserIds = data.fixedUserIds.filter((id) => !eligibleIds.has(id));
+      if (ineligibleUserIds.length > 0) {
+        throw new AppError(
+          409,
+          "FIXED_USER_NOT_ELIGIBLE",
+          "Every fixed user must be an active paid client",
+          { userIds: ineligibleUserIds }
+        );
+      }
     }
+
+    const createdIds: number[] = [];
+    for (let week = 0; week < data.repeatWeeks; week += 1) {
+      const gymClass = await tx.gymClass.create({
+        data: {
+          title,
+          description: data.description,
+          classTypeId,
+          teacherId,
+          maxCapacity,
+          startsAt: addWeeks(startsAt, week),
+          endsAt: addWeeks(endsAt, week),
+          imageUrl: data.imageOverrideUrl
+        },
+        select: { id: true }
+      });
+      createdIds.push(gymClass.id);
+
+      if (data.fixedUserIds.length > 0) {
+        await tx.reservation.createMany({
+          data: data.fixedUserIds.map((userId) => ({
+            userId,
+            classId: gymClass.id,
+            status: "CONFIRMADA" as const,
+            requestedAt: now,
+            fixedEnrollment: true
+          }))
+        });
+      }
+    }
+
+    return tx.gymClass.findMany({
+      where: { id: { in: createdIds } },
+      orderBy: { startsAt: "asc" },
+      include: {
+        classType: true,
+        teacher: true,
+        reservations: { where: { status: { in: [...visibleReservationStatuses] } }, include: { user: true } },
+        _count: { select: { reservations: { where: { status: { in: [...occupyingReservationStatuses] } } } } }
+      }
+    });
+  }, {
+    isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+    maxWait: 5_000,
+    timeout: 20_000
   });
 
   const [classTypeImages, imageBank] = await loadClassImageSources();
-  res.status(201).json(classDto(gymClass, {
+  const serializedClasses = classes.map((gymClass) => classDto(gymClass, {
     effectiveImageUrl: effectiveClassImage(gymClass, classTypeImages, imageBank),
     absoluteUrl: (value) => absolutePublicUrl(req, value),
-    viewerRole: req.auth.role
+    viewerRole: auth.role,
+    viewerUserId: auth.userId
   }));
+  const primaryClass = serializedClasses[0];
+  res.status(201).json({
+    ...primaryClass,
+    series: serializedClasses,
+    createdCount: serializedClasses.length,
+    created_count: serializedClasses.length
+  });
 }));
 
 router.put("/:id", authenticate, requireRoles("ADMIN", "TEACHER"), validate({ params: idParams, body: classBody }), asyncHandler(async (req, res) => {
@@ -167,7 +271,7 @@ router.put("/:id", authenticate, requireRoles("ADMIN", "TEACHER"), validate({ pa
   if (teacherId) await assertTeacher(teacherId);
 
   const [classTypeImages, imageBank] = await loadClassImageSources();
-  const gymClass = await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const locked = await tx.$queryRaw<Array<{ id: number }>>`
       SELECT id
       FROM Clases
@@ -206,7 +310,7 @@ router.put("/:id", authenticate, requireRoles("ADMIN", "TEACHER"), validate({ pa
       }
     }
 
-    return tx.gymClass.update({
+    await tx.gymClass.update({
       where: { id: params.id },
       data: {
         title: data.title,
@@ -217,7 +321,14 @@ router.put("/:id", authenticate, requireRoles("ADMIN", "TEACHER"), validate({ pa
         startsAt: data.startsAt,
         endsAt: data.endsAt,
         imageUrl: imageOverrideUrl
-      },
+      }
+    });
+
+    const promoted = data.maxCapacity !== undefined && data.maxCapacity > existing.maxCapacity
+      ? await reservationService.promoteWaitlistForCapacityIncrease(tx, params.id)
+      : [];
+    const gymClass = await tx.gymClass.findUniqueOrThrow({
+      where: { id: params.id },
       include: {
         classType: true,
         teacher: true,
@@ -225,15 +336,18 @@ router.put("/:id", authenticate, requireRoles("ADMIN", "TEACHER"), validate({ pa
         _count: { select: { reservations: { where: { status: { in: [...occupyingReservationStatuses] } } } } }
       }
     });
+    return { gymClass, promoted };
   }, {
     isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
     maxWait: 5_000,
     timeout: 15_000
   });
-  res.json(classDto(gymClass, {
-    effectiveImageUrl: effectiveClassImage(gymClass, classTypeImages, imageBank),
+  await reservationService.notifyPromotedBestEffort(result.promoted);
+  res.json(classDto(result.gymClass, {
+    effectiveImageUrl: effectiveClassImage(result.gymClass, classTypeImages, imageBank),
     absoluteUrl: (value) => absolutePublicUrl(req, value),
-    viewerRole: auth.role
+    viewerRole: auth.role,
+    viewerUserId: auth.userId
   }));
 }));
 
@@ -243,10 +357,12 @@ router.delete("/:id", authenticate, requireRoles("ADMIN"), validate({ params: id
   res.status(204).send();
 }));
 
-router.post("/:id/reserve", authenticate, requireRoles("CLIENT"), validate({ params: idParams }), asyncHandler(async (req, res) => {
+router.post("/:id/reserve", authenticate, requireRoles("CLIENT"), validate({ params: idParams, body: reserveBody }), asyncHandler(async (req, res) => {
   if (!req.auth) throw new AppError(401, "AUTH_REQUIRED", "Authentication is required");
   const params = req.params as unknown as z.infer<typeof idParams>;
-  const result = await reservationService.reserveClass(req.auth.userId, params.id);
+  const body = req.body as z.infer<typeof reserveBody>;
+  const hideName = body.hideName ?? body.hide_name ?? body.ocultar_nombre ?? false;
+  const result = await reservationService.reserveClass(req.auth.userId, params.id, new Date(), hideName);
   res.status(201).json(result);
 }));
 

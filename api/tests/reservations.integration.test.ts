@@ -2,6 +2,8 @@ import request from "supertest";
 import { addMinutes } from "date-fns";
 import { createApp } from "../src/app.js";
 import { prisma } from "../src/db/prisma.js";
+import { expoPushService } from "../src/services/push.service.js";
+import { reservationService } from "../src/services/reservation.service.js";
 import { signAccessToken } from "../src/services/token.service.js";
 import { createGymClass, createUser, resetDatabase } from "./helpers/database.js";
 
@@ -18,6 +20,71 @@ describe("Reservation endpoints", () => {
 
   afterAll(async () => {
     await prisma.$disconnect();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("accepts reservations only before the exact 30-minute cutoff", async () => {
+    const teacher = await createUser({ email: "cutoff-teacher@test.local", role: "TEACHER" });
+    const beforeCutoff = await createUser({ email: "before-cutoff@test.local" });
+    const atCutoff = await createUser({ email: "at-cutoff@test.local" });
+    const insideCutoff = await createUser({ email: "inside-cutoff@test.local" });
+    const atStart = await createUser({ email: "at-start@test.local" });
+    const startsAt = addMinutes(new Date(), 120);
+    const cutoff = addMinutes(startsAt, -30);
+    const { gymClass } = await createGymClass({ teacherId: teacher.id, capacity: 5, startsAt });
+
+    await expect(reservationService.reserveClass(
+      beforeCutoff.id,
+      gymClass.id,
+      new Date(cutoff.getTime() - 1)
+    )).resolves.toMatchObject({ status: "CONFIRMADA" });
+
+    await expect(reservationService.reserveClass(atCutoff.id, gymClass.id, cutoff))
+      .rejects.toMatchObject({ code: "RESERVATION_CLOSED" });
+    await expect(reservationService.reserveClass(
+      insideCutoff.id,
+      gymClass.id,
+      new Date(cutoff.getTime() + 1)
+    )).rejects.toMatchObject({ code: "RESERVATION_CLOSED" });
+    await expect(reservationService.reserveClass(atStart.id, gymClass.id, startsAt))
+      .rejects.toMatchObject({ code: "CLASS_ALREADY_STARTED" });
+  });
+
+  it("lets a user promoted at the exact cutoff validate until class start", async () => {
+    const admin = await createUser({ email: "cutoff-promotion-admin@test.local", role: "ADMIN" });
+    const teacher = await createUser({ email: "cutoff-promotion-teacher@test.local", role: "TEACHER" });
+    const occupant = await createUser({ email: "cutoff-promotion-occupant@test.local" });
+    const waitlisted = await createUser({ email: "cutoff-promotion-waitlisted@test.local" });
+    const startsAt = addMinutes(new Date(), 120);
+    const cutoff = addMinutes(startsAt, -30);
+    const { gymClass } = await createGymClass({ teacherId: teacher.id, capacity: 1, startsAt });
+    await prisma.reservation.createMany({
+      data: [
+        { userId: occupant.id, classId: gymClass.id, status: "CONFIRMADA" },
+        { userId: waitlisted.id, classId: gymClass.id, status: "EN_ESPERA" }
+      ]
+    });
+
+    const result = await reservationService.cancelReservationAndPromote({
+      actorUserId: admin.id,
+      actorRole: admin.role,
+      targetUserId: occupant.id,
+      classId: gymClass.id,
+      now: cutoff
+    });
+
+    expect(result.promoted).toHaveLength(1);
+    await expect(prisma.reservation.findUniqueOrThrow({
+      where: { userId_classId: { userId: waitlisted.id, classId: gymClass.id } }
+    })).resolves.toMatchObject({ status: "CONFIRMADA", promotedAt: cutoff });
+    await expect(reservationService.validateAttendance(
+      waitlisted.id,
+      gymClass.id,
+      new Date(cutoff.getTime() + 1)
+    )).resolves.toMatchObject({ status: "ASISTENCIA_VALIDADA" });
   });
 
   it("prevents transactional overbooking under concurrent requests", async () => {
@@ -99,6 +166,54 @@ describe("Reservation endpoints", () => {
     expect(cleanReservation.status).toBe("CONFIRMADA");
     expect(cleanReservation.promotedAt).toBeInstanceOf(Date);
     expect(penalizedReservation.status).toBe("EN_ESPERA");
+  });
+
+  it("promotes enough waitlisted users in priority order when capacity increases", async () => {
+    const admin = await createUser({ email: "capacity-promotion-admin@test.local", role: "ADMIN" });
+    const teacher = await createUser({ email: "capacity-promotion-teacher@test.local", role: "TEACHER" });
+    const occupant = await createUser({ email: "capacity-promotion-occupant@test.local" });
+    const penalizedEarly = await createUser({ email: "capacity-promotion-penalized-early@test.local" });
+    const cleanEarly = await createUser({ email: "capacity-promotion-clean-early@test.local" });
+    const cleanLate = await createUser({ email: "capacity-promotion-clean-late@test.local" });
+    const penalizedLate = await createUser({ email: "capacity-promotion-penalized-late@test.local" });
+    const { classType, gymClass } = await createGymClass({ teacherId: teacher.id, capacity: 1 });
+
+    await prisma.reservation.createMany({
+      data: [
+        { userId: occupant.id, classId: gymClass.id, status: "CONFIRMADA", requestedAt: new Date("2026-01-01T09:59:00.000Z") },
+        { userId: penalizedEarly.id, classId: gymClass.id, status: "EN_ESPERA", requestedAt: new Date("2026-01-01T10:00:00.000Z") },
+        { userId: cleanEarly.id, classId: gymClass.id, status: "EN_ESPERA", requestedAt: new Date("2026-01-01T10:01:00.000Z") },
+        { userId: cleanLate.id, classId: gymClass.id, status: "EN_ESPERA", requestedAt: new Date("2026-01-01T10:02:00.000Z") },
+        { userId: penalizedLate.id, classId: gymClass.id, status: "EN_ESPERA", requestedAt: new Date("2026-01-01T10:03:00.000Z") }
+      ]
+    });
+    await prisma.penalty.createMany({
+      data: [
+        { userId: penalizedEarly.id, classTypeId: classType.id, active: true },
+        { userId: penalizedLate.id, classTypeId: classType.id, active: true }
+      ]
+    });
+    const pushSpy = jest.spyOn(expoPushService, "sendToUser").mockResolvedValue();
+
+    const response = await request(app)
+      .put(`/api/classes/${gymClass.id}`)
+      .send({ maxCapacity: 4 })
+      .set("Authorization", `Bearer ${signAccessToken({ userId: admin.id, role: admin.role })}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ maxCapacity: 4, _count: { reservations: 4 } });
+    const reservations = await prisma.reservation.findMany({
+      where: { classId: gymClass.id },
+      orderBy: { requestedAt: "asc" }
+    });
+    expect(reservations.filter((reservation) => reservation.status === "CONFIRMADA").map((reservation) => reservation.userId))
+      .toEqual([occupant.id, penalizedEarly.id, cleanEarly.id, cleanLate.id]);
+    expect(reservations.find((reservation) => reservation.userId === penalizedLate.id)?.status).toBe("EN_ESPERA");
+    expect(pushSpy.mock.calls.map(([userId]) => userId)).toEqual([
+      cleanEarly.id,
+      cleanLate.id,
+      penalizedEarly.id
+    ]);
   });
 
   it("allows a user promoted inside the cutoff to validate before class start", async () => {
@@ -239,6 +354,41 @@ describe("Reservation endpoints", () => {
     }
   });
 
+  it("serializes capacity promotion with a concurrent reservation without overbooking", async () => {
+    const admin = await createUser({ email: "concurrent-promotion-admin@test.local", role: "ADMIN" });
+    const teacher = await createUser({ email: "concurrent-promotion-teacher@test.local", role: "TEACHER" });
+    const occupant = await createUser({ email: "concurrent-promotion-occupant@test.local" });
+    const queued = await createUser({ email: "concurrent-promotion-queued@test.local" });
+    const newcomer = await createUser({ email: "concurrent-promotion-newcomer@test.local" });
+    const { gymClass } = await createGymClass({ teacherId: teacher.id, capacity: 1 });
+    await prisma.reservation.createMany({
+      data: [
+        { userId: occupant.id, classId: gymClass.id, status: "CONFIRMADA", requestedAt: new Date("2026-01-01T10:00:00.000Z") },
+        { userId: queued.id, classId: gymClass.id, status: "EN_ESPERA", requestedAt: new Date("2026-01-01T10:01:00.000Z") }
+      ]
+    });
+
+    const [capacityResponse, reservationResponse] = await Promise.all([
+      request(app)
+        .put(`/api/classes/${gymClass.id}`)
+        .send({ maxCapacity: 2 })
+        .set("Authorization", `Bearer ${signAccessToken({ userId: admin.id, role: admin.role })}`),
+      request(app)
+        .post(`/api/classes/${gymClass.id}/reservations`)
+        .set("Authorization", `Bearer ${signAccessToken({ userId: newcomer.id, role: newcomer.role })}`)
+    ]);
+
+    expect(capacityResponse.status).toBe(200);
+    expect(reservationResponse.status).toBe(201);
+    const updatedClass = await prisma.gymClass.findUniqueOrThrow({ where: { id: gymClass.id } });
+    const reservations = await prisma.reservation.findMany({ where: { classId: gymClass.id } });
+    const occupied = reservations.filter((reservation) => ["CONFIRMADA", "ASISTENCIA_VALIDADA"].includes(reservation.status));
+    expect(updatedClass.maxCapacity).toBe(2);
+    expect(occupied).toHaveLength(2);
+    expect(occupied.map((reservation) => reservation.userId)).toEqual(expect.arrayContaining([occupant.id, queued.id]));
+    expect(reservations.find((reservation) => reservation.userId === newcomer.id)?.status).toBe("EN_ESPERA");
+  });
+
   it("lets the owning teacher remove a user and exposes occupied capacity separately from waitlist", async () => {
     const teacher = await createUser({ email: "teacher@test.local", role: "TEACHER" });
     const occupant = await createUser({ email: "occupant@test.local" });
@@ -268,7 +418,7 @@ describe("Reservation endpoints", () => {
     expect(promotedReservation.status).toBe("CONFIRMADA");
   });
 
-  it("limits participant identities to admins and the owning teacher while clients see only themselves", async () => {
+  it("returns public attendee summaries to clients and full identities to privileged roles", async () => {
     const admin = await createUser({ email: "privacy-admin@test.local", role: "ADMIN" });
     const teacher = await createUser({ email: "privacy-teacher@test.local", role: "TEACHER" });
     const clientA = await createUser({
@@ -303,12 +453,13 @@ describe("Reservation endpoints", () => {
       maxCapacity: 2,
       _count: { reservations: 2 }
     });
-    expect(clientResponse.body[0].reservations).toHaveLength(1);
-    expect(clientResponse.body[0].reservations[0]).toMatchObject({
-      userId: clientA.id,
-      user: { id: clientA.id, name: clientA.name, email: clientA.email }
-    });
-    expect(JSON.stringify(clientResponse.body)).not.toContain(clientB.name);
+    expect(clientResponse.body[0].reservations).toHaveLength(2);
+    expect(clientResponse.body[0].reservations.map((reservation: { user: { id: number; name: string } }) => reservation.user))
+      .toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: clientA.id, name: clientA.name }),
+        expect.objectContaining({ id: clientB.id, name: clientB.name })
+      ]));
+    expect(JSON.stringify(clientResponse.body)).not.toContain(clientA.email);
     expect(JSON.stringify(clientResponse.body)).not.toContain(clientB.email);
 
     for (const privilegedResponse of [teacherResponse, adminResponse]) {

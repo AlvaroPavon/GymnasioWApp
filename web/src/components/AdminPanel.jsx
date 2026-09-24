@@ -7,7 +7,7 @@ import ActivitiesCalendar from './activities/ActivitiesCalendar';
 import ClassTypeImageManager from './activities/ClassTypeImageManager';
 import { useAuth } from '../context/AuthContext';
 import { API_URL, getApiErrorMessage } from '../lib/api';
-import { selectedClassById } from '../lib/classPayload';
+import { buildClassCreatePayload, selectedClassById } from '../lib/classPayload';
 
 export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 }) {
   const { user: currentUser } = useAuth();
@@ -42,6 +42,8 @@ export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 
   const [maxCapacity, setMaxCapacity] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
+  const [repeatWeeks, setRepeatWeeks] = useState('1');
+  const [fixedUserIds, setFixedUserIds] = useState([]);
 
   useEffect(() => {
     fetchUsers();
@@ -226,21 +228,26 @@ export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 
   const createClass = async (e) => {
     e.preventDefault();
     try {
-      await axios.post(`${API_URL}/classes`, {
+      const payload = buildClassCreatePayload({
         title,
-        tipo_clase_id: classTypeId ? Number(classTypeId) : undefined,
-        teacher_id: Number(teacherId),
-        max_capacity: Number(maxCapacity),
-        start_time: new Date(startTime).toISOString(),
-        end_time: new Date(endTime).toISOString()
+        classTypeId,
+        teacherId,
+        maxCapacity,
+        startTime,
+        endTime,
+        repeatWeeks,
+        fixedUserIds
       });
-      alert('Clase creada');
+      const response = await axios.post(`${API_URL}/classes`, payload);
+      alert(response.data?.createdCount > 1 ? `${response.data.createdCount} clases creadas` : 'Clase creada');
       setTitle('');
       setClassTypeId('');
       setTeacherId('');
       setMaxCapacity('');
       setStartTime('');
       setEndTime('');
+      setRepeatWeeks('1');
+      setFixedUserIds([]);
       fetchClasses();
     } catch(err) {
       alert(getApiErrorMessage(err, 'Error creando clase'));
@@ -248,6 +255,17 @@ export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 
   };
 
   const teachers = users.filter(u => u.role === 'TEACHER');
+  const eligibleClients = users.filter((candidate) => {
+    if (candidate.role !== 'CLIENT') return false;
+    const status = candidate.monthlyStatus || candidate.estado_mensualidad;
+    const expiry = candidate.membershipExpiresAt || candidate.membership_expires_at;
+    return status === 'PAGADO' && expiry && new Date(expiry).getTime() > Date.now();
+  });
+  const toggleFixedUser = (userId) => {
+    setFixedUserIds((current) => current.includes(userId)
+      ? current.filter((id) => id !== userId)
+      : [...current, userId]);
+  };
 
   const nowTime = new Date();
   const upcomingClasses = classes.filter(c => new Date(c.start_time) >= nowTime);
@@ -380,6 +398,11 @@ export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 
                 Capacidad máxima
                 <input type="number" min="1" required value={maxCapacity} onChange={event => setMaxCapacity(event.target.value)} className="bg-slate-900 border border-slate-700 p-3 rounded text-white" />
               </label>
+              <label className="grid gap-1 text-xs font-bold text-slate-400 md:col-span-2">
+                Repetir cada semana
+                <input type="number" min="1" max="52" required value={repeatWeeks} onChange={event => setRepeatWeeks(event.target.value)} className="bg-slate-900 border border-slate-700 p-3 rounded text-white" />
+                <span className="font-normal text-slate-500">Indicá cuántas semanas consecutivas querés crear.</span>
+              </label>
               <label className="grid gap-1 text-xs font-bold text-slate-400">
                 Inicio
                 <input type="datetime-local" required value={startTime} onChange={event => setStartTime(event.target.value)} className="w-full bg-slate-900 border border-slate-700 p-3 rounded text-white" />
@@ -388,8 +411,29 @@ export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 
                 Fin
                 <input type="datetime-local" required value={endTime} onChange={event => setEndTime(event.target.value)} className="w-full bg-slate-900 border border-slate-700 p-3 rounded text-white" />
               </label>
+              <fieldset className="rounded-xl border border-slate-700 bg-slate-950/50 p-4 md:col-span-2">
+                <legend className="px-2 text-xs font-bold text-emerald-300">Alumnos fijos</legend>
+                <p className="mb-3 text-xs text-slate-500">Quedarán confirmados automáticamente en cada semana creada.</p>
+                {eligibleClients.length > 0 ? (
+                  <div className="grid max-h-48 gap-2 overflow-y-auto pr-1 sm:grid-cols-2 lg:grid-cols-3">
+                    {eligibleClients.map((client) => (
+                      <label key={client.id} className="flex cursor-pointer items-center gap-2 rounded-lg bg-slate-900 p-2 text-xs text-slate-200">
+                        <input
+                          type="checkbox"
+                          checked={fixedUserIds.includes(client.id)}
+                          onChange={() => toggleFixedUser(client.id)}
+                          className="h-4 w-4 accent-emerald-400"
+                        />
+                        <span className="truncate">{client.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500">No hay clientes con cuota activa.</p>
+                )}
+              </fieldset>
               <button type="submit" className="md:col-span-2 bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold p-3 rounded-lg shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400">
-                Crear clase
+                {Number(repeatWeeks) > 1 ? `Crear ${repeatWeeks} clases` : 'Crear clase'}
               </button>
             </form>
           </section>

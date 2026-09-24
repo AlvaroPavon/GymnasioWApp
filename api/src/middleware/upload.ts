@@ -6,14 +6,15 @@ import sharp from "sharp";
 import { AppError } from "../errors/AppError.js";
 
 const uploadRoot = path.resolve(process.cwd(), "uploads");
-const allowedMimeTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
-const classTypeMimeTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
-const decodedClassTypeFormats = new Set(["jpeg", "png", "webp"]);
-const classTypeUploadDir = path.join(uploadRoot, "class-types");
-const generatedClassTypeUploadName = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.webp$/i;
-const maxClassTypeImageWidth = 8_192;
-const maxClassTypeImageHeight = 8_192;
-const maxClassTypeImagePixels = 25_000_000;
+const acceptedMimeFormats = new Map([
+  ["image/jpeg", "jpeg"],
+  ["image/png", "png"],
+  ["image/webp", "webp"]
+]);
+const generatedUploadName = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.webp$/i;
+const maxImageWidth = 8_192;
+const maxImageHeight = 8_192;
+const maxImagePixels = 25_000_000;
 
 export const uploadFileSizeLimits = {
   profile: 2 * 1024 * 1024,
@@ -21,116 +22,172 @@ export const uploadFileSizeLimits = {
   image: 4 * 1024 * 1024
 } as const;
 
+type RasterUploadKind = keyof typeof uploadFileSizeLimits;
+
+const uploadFolders: Record<RasterUploadKind, string> = {
+  profile: "profiles",
+  hero: "settings",
+  image: "class-types"
+};
+
 export function uploadFileSizeLimitMb(field?: string) {
   if (!field || !(field in uploadFileSizeLimits)) return undefined;
-  return uploadFileSizeLimits[field as keyof typeof uploadFileSizeLimits] / (1024 * 1024);
-}
-
-function ensureDir(dir: string) {
-  fs.mkdirSync(dir, { recursive: true });
-}
-
-function storageFor(folder: string) {
-  const destination = path.join(uploadRoot, folder);
-  ensureDir(destination);
-
-  return multer.diskStorage({
-    destination,
-    filename: (_req, file, cb) => {
-      const ext = path.extname(file.originalname).toLowerCase();
-      cb(null, `${crypto.randomUUID()}${ext}`);
-    }
-  });
+  return uploadFileSizeLimits[field as RasterUploadKind] / (1024 * 1024);
 }
 
 function imageFileFilter(_req: Express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) {
-  if (!allowedMimeTypes.has(file.mimetype)) {
-    cb(new AppError(400, "INVALID_IMAGE_TYPE", "Only jpeg, png, webp and gif images are allowed"));
-    return;
-  }
-  cb(null, true);
-}
-
-export function publicUploadUrl(file?: Express.Multer.File) {
-  if (!file) return undefined;
-  const normalized = file.path.replaceAll("\\", "/");
-  const marker = "/uploads/";
-  const index = normalized.lastIndexOf(marker);
-  return index >= 0 ? normalized.slice(index) : `/uploads/${path.basename(file.path)}`;
-}
-
-export const uploadProfile = multer({
-  storage: storageFor("profiles"),
-  fileFilter: imageFileFilter,
-  limits: { fileSize: uploadFileSizeLimits.profile }
-});
-
-export const uploadSettings = multer({
-  storage: storageFor("settings"),
-  fileFilter: imageFileFilter,
-  limits: { fileSize: uploadFileSizeLimits.hero }
-});
-
-function classTypeImageFilter(_req: Express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) {
-  if (!classTypeMimeTypes.has(file.mimetype)) {
+  if (!acceptedMimeFormats.has(file.mimetype)) {
     cb(new AppError(400, "INVALID_IMAGE_TYPE", "Only jpeg, png and webp images are allowed"));
     return;
   }
   cb(null, true);
 }
 
-export const uploadClassTypeImage = multer({
-  storage: multer.memoryStorage(),
-  fileFilter: classTypeImageFilter,
-  limits: { fileSize: uploadFileSizeLimits.image, files: 1 }
-});
+function rasterUploader(kind: RasterUploadKind) {
+  return multer({
+    storage: multer.memoryStorage(),
+    fileFilter: imageFileFilter,
+    limits: { fileSize: uploadFileSizeLimits[kind], files: 1 }
+  });
+}
 
-async function normalizeClassTypeImage(file: Express.Multer.File) {
+export const uploadProfile = rasterUploader("profile");
+export const uploadSettings = rasterUploader("hero");
+export const uploadClassTypeImage = rasterUploader("image");
+
+async function normalizeRasterImage(file: Express.Multer.File, kind: RasterUploadKind) {
   try {
     const metadata = await sharp(file.buffer, {
       failOn: "warning",
       limitInputPixels: false
     }).metadata();
+    const expectedFormat = acceptedMimeFormats.get(file.mimetype);
 
-    if (!metadata.format || !decodedClassTypeFormats.has(metadata.format) || !metadata.width || !metadata.height) {
+    if (
+      !expectedFormat
+      || metadata.format !== expectedFormat
+      || !metadata.width
+      || !metadata.height
+      || (metadata.pages ?? 1) !== 1
+    ) {
       throw new AppError(400, "INVALID_IMAGE_CONTENT", "The uploaded file is not a valid jpeg, png or webp image");
     }
 
     const pixels = metadata.width * metadata.height;
-    if (
-      metadata.width > maxClassTypeImageWidth
-      || metadata.height > maxClassTypeImageHeight
-      || pixels > maxClassTypeImagePixels
-    ) {
+    if (metadata.width > maxImageWidth || metadata.height > maxImageHeight || pixels > maxImagePixels) {
       throw new AppError(
         400,
         "IMAGE_DIMENSIONS_TOO_LARGE",
-        `Image dimensions must not exceed ${maxClassTypeImageWidth}x${maxClassTypeImageHeight} or ${maxClassTypeImagePixels} pixels`
+        `Image dimensions must not exceed ${maxImageWidth}x${maxImageHeight} or ${maxImagePixels} pixels`
       );
     }
 
-    return await sharp(file.buffer, {
+    const normalizedImage = await sharp(file.buffer, {
       failOn: "warning",
-      limitInputPixels: maxClassTypeImagePixels
+      limitInputPixels: maxImagePixels
     })
       .rotate()
       .webp({ quality: 82, alphaQuality: 90, effort: 4 })
       .toBuffer();
+
+    if (normalizedImage.byteLength > uploadFileSizeLimits[kind]) {
+      throw new AppError(
+        400,
+        "IMAGE_TOO_LARGE",
+        `Normalized image exceeds the ${uploadFileSizeLimitMb(kind)} MB limit`
+      );
+    }
+
+    return normalizedImage;
   } catch (error) {
     if (error instanceof AppError) throw error;
     throw new AppError(400, "INVALID_IMAGE_CONTENT", "The uploaded file is not a valid jpeg, png or webp image");
   }
 }
 
-/** Decodes and stores a metadata-free canonical WebP using a server-generated filename. */
-export async function persistClassTypeImage(file: Express.Multer.File) {
-  const normalizedImage = await normalizeClassTypeImage(file);
-
-  await fs.promises.mkdir(classTypeUploadDir, { recursive: true });
+async function persistRasterImage(file: Express.Multer.File, kind: RasterUploadKind) {
+  const normalizedImage = await normalizeRasterImage(file, kind);
+  const folder = uploadFolders[kind];
+  const uploadDir = path.join(uploadRoot, folder);
   const filename = `${crypto.randomUUID()}.webp`;
-  const absolutePath = path.join(classTypeUploadDir, filename);
-  await fs.promises.writeFile(absolutePath, normalizedImage, { flag: "wx" });
-  return `/uploads/class-types/${filename}`;
+  const absolutePath = path.join(uploadDir, filename);
+
+  await fs.promises.mkdir(uploadDir, { recursive: true });
+  try {
+    await fs.promises.writeFile(absolutePath, normalizedImage, { flag: "wx" });
+  } catch (error) {
+    await fs.promises.unlink(absolutePath).catch(() => undefined);
+    throw error;
+  }
+
+  return `/uploads/${folder}/${filename}`;
+}
+
+function generatedUploadPath(imageUrl: string, kind: RasterUploadKind) {
+  const folder = uploadFolders[kind];
+  const prefix = `/uploads/${folder}/`;
+  let pathname: string;
+  try {
+    pathname = new URL(imageUrl, "http://local.invalid").pathname;
+  } catch {
+    return null;
+  }
+  if (!pathname.startsWith(prefix)) return null;
+
+  const filename = pathname.slice(prefix.length);
+  if (!generatedUploadName.test(filename)) return null;
+  const uploadDir = path.join(uploadRoot, folder);
+  const target = path.resolve(uploadDir, filename);
+  const relative = path.relative(uploadDir, target);
+  if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) return null;
+  return target;
+}
+
+async function deleteGeneratedUpload(imageUrl: string, kind: RasterUploadKind) {
+  const target = generatedUploadPath(imageUrl, kind);
+  if (!target) return false;
+  try {
+    await fs.promises.unlink(target);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+    throw error;
+  }
+}
+
+async function withPersistedRasterImage<T>(
+  file: Express.Multer.File | undefined,
+  kind: RasterUploadKind,
+  operation: (imageUrl: string | undefined) => Promise<T>
+) {
+  const imageUrl = file ? await persistRasterImage(file, kind) : undefined;
+  try {
+    return await operation(imageUrl);
+  } catch (error) {
+    if (imageUrl) await deleteGeneratedUpload(imageUrl, kind).catch(() => undefined);
+    throw error;
+  }
+}
+
+/** Persists a canonical profile WebP and removes it if the owning database mutation fails. */
+export function withPersistedProfileImage<T>(
+  file: Express.Multer.File | undefined,
+  operation: (imageUrl: string | undefined) => Promise<T>
+) {
+  return withPersistedRasterImage(file, "profile", operation);
+}
+
+/** Persists a canonical hero WebP and removes it if the owning database mutation fails. */
+export function withPersistedHeroImage<T>(
+  file: Express.Multer.File | undefined,
+  operation: (imageUrl: string | undefined) => Promise<T>
+) {
+  return withPersistedRasterImage(file, "hero", operation);
+}
+
+/** Decodes and stores a metadata-free canonical WebP using a server-generated filename. */
+export function persistClassTypeImage(file: Express.Multer.File) {
+  return persistRasterImage(file, "image");
 }
 
 /**
@@ -166,9 +223,10 @@ export function generatedClassTypeUploadKey(imageUrl?: string | null, trustedOri
   if (!pathname.startsWith("/uploads/class-types/")) return null;
 
   const filename = pathname.slice("/uploads/class-types/".length);
-  if (!generatedClassTypeUploadName.test(filename)) return null;
-  const target = path.resolve(classTypeUploadDir, filename);
-  const relative = path.relative(classTypeUploadDir, target);
+  if (!generatedUploadName.test(filename)) return null;
+  const uploadDir = path.join(uploadRoot, uploadFolders.image);
+  const target = path.resolve(uploadDir, filename);
+  const relative = path.relative(uploadDir, target);
   if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) return null;
   return filename.toLowerCase();
 }
@@ -177,13 +235,5 @@ export function generatedClassTypeUploadKey(imageUrl?: string | null, trustedOri
 export async function deleteLocalClassTypeImage(imageUrl?: string | null, trustedOrigin?: string | null) {
   const filename = generatedClassTypeUploadKey(imageUrl, trustedOrigin);
   if (!filename) return false;
-  const target = path.resolve(classTypeUploadDir, filename);
-
-  try {
-    await fs.promises.unlink(target);
-    return true;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
-    throw error;
-  }
+  return deleteGeneratedUpload(`/uploads/class-types/${filename}`, "image");
 }

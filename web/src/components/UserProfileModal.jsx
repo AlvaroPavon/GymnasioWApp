@@ -22,6 +22,8 @@ export default function UserProfileModal({ isOpen, onClose, viewUser = null }) {
   const [loading, setLoading] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [passwordLoading, setPasswordLoading] = useState(false);
+  const [classReminderEnabled, setClassReminderEnabled] = useState(false);
+  const [reminderLoading, setReminderLoading] = useState(false);
 
   // Al abrir/cambiar objetivo, hidratar datos
   React.useEffect(() => {
@@ -32,6 +34,7 @@ export default function UserProfileModal({ isOpen, onClose, viewUser = null }) {
       setRole(targetUser.role || 'CLIENT');
       setMonthlyStatus(targetUser.estado_mensualidad || targetUser.monthlyStatus || 'IMPAGADO');
       setMembershipExpiresAt(dateInputValue(targetUser.membership_expires_at || targetUser.membershipExpiresAt));
+      setClassReminderEnabled(Boolean(targetUser.classReminderEnabled ?? targetUser.class_reminder_enabled));
       setNewPassword('');
     }
   }, [targetUser]);
@@ -93,6 +96,23 @@ export default function UserProfileModal({ isOpen, onClose, viewUser = null }) {
       alert(getApiErrorMessage(error, 'No se pudo cambiar la contraseña'));
     } finally {
       setPasswordLoading(false);
+    }
+  };
+
+  const handleReminderPreference = async (enabled) => {
+    try {
+      setReminderLoading(true);
+      const response = await axios.patch(`${API_URL}/users/me/preferences`, {
+        classReminderEnabled: enabled
+      });
+      setClassReminderEnabled(enabled);
+      const updatedUser = { ...user, ...response.data };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      setUser(updatedUser);
+    } catch (error) {
+      alert(getApiErrorMessage(error, 'No se pudo actualizar el recordatorio.'));
+    } finally {
+      setReminderLoading(false);
     }
   };
 
@@ -224,6 +244,21 @@ export default function UserProfileModal({ isOpen, onClose, viewUser = null }) {
                     {passwordLoading ? 'Cambiando...' : 'Cambiar contraseña'}
                   </button>
                 </div>
+              )}
+              {isMe && targetUser.role === 'CLIENT' && (
+                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-emerald-400/20 bg-emerald-400/10 p-3">
+                  <input
+                    type="checkbox"
+                    checked={classReminderEnabled}
+                    disabled={reminderLoading}
+                    onChange={(event) => handleReminderPreference(event.target.checked)}
+                    className="mt-1 h-5 w-5 accent-emerald-400"
+                  />
+                  <span>
+                    <span className="block text-sm font-bold text-white">Avisarme una hora antes</span>
+                    <span className="block text-xs text-slate-400">Recibirás una notificación push por cada clase reservada.</span>
+                  </span>
+                </label>
               )}
               <div>
                 <label className="block text-xs text-slate-400 mb-1">Subir Foto de Perfil (Local)</label>

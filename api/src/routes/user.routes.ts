@@ -6,7 +6,7 @@ import { prisma } from "../db/prisma.js";
 import { AppError } from "../errors/AppError.js";
 import { authenticate, requireRoles } from "../middleware/auth.js";
 import { asyncHandler } from "../middleware/asyncHandler.js";
-import { uploadProfile, publicUploadUrl } from "../middleware/upload.js";
+import { uploadProfile, withPersistedProfileImage } from "../middleware/upload.js";
 import { validate } from "../middleware/validate.js";
 import { env } from "../config/env.js";
 import { userDto } from "../utils/dto.js";
@@ -45,6 +45,9 @@ const updateUserBody = z.object({
 
 const resetPasswordBody = z.object({
   password: z.string().min(8).max(128)
+}).strict();
+const notificationPreferencesBody = z.object({
+  classReminderEnabled: z.boolean()
 }).strict();
 
 /**
@@ -99,19 +102,21 @@ router.post("/", authenticate, requireRoles("ADMIN"), uploadProfile.single("prof
   const exists = await prisma.user.findUnique({ where: { email } });
   if (exists) throw new AppError(409, "EMAIL_ALREADY_EXISTS", "Email is already registered");
 
-  const profilePicture = publicUploadUrl(req.file) ?? body.profilePicture ?? body.profile_picture;
   const membership = normalizeMembership(body);
-  const user = await prisma.user.create({
-    data: {
-      name: body.name.trim(),
-      email,
-      passwordHash: await hashUserPassword(body.password),
-      role: body.role,
-      monthlyStatus: membership.monthlyStatus,
-      membershipExpiresAt: membership.membershipExpiresAt,
-      phone: body.phone,
-      profilePicture
-    }
+  const user = await withPersistedProfileImage(req.file, async (uploadedProfilePicture) => {
+    const profilePicture = uploadedProfilePicture ?? body.profilePicture ?? body.profile_picture;
+    return prisma.user.create({
+      data: {
+        name: body.name.trim(),
+        email,
+        passwordHash: await hashUserPassword(body.password),
+        role: body.role,
+        monthlyStatus: membership.monthlyStatus,
+        membershipExpiresAt: membership.membershipExpiresAt,
+        phone: body.phone,
+        profilePicture
+      }
+    });
   });
 
   res.status(201).json(userDto(user));
@@ -121,15 +126,40 @@ router.put("/profile", authenticate, uploadProfile.single("profile"), asyncHandl
   if (!req.auth) throw new AppError(401, "AUTH_REQUIRED", "Authentication is required");
   const body = updateUserBody.parse(req.body);
   await assertEmailAvailable(body.email, req.auth.userId);
-  const profilePicture = publicUploadUrl(req.file) ?? body.profilePicture ?? body.profile_picture;
+  const user = await withPersistedProfileImage(req.file, async (uploadedProfilePicture) => {
+    const profilePicture = uploadedProfilePicture ?? body.profilePicture ?? body.profile_picture;
+    return prisma.user.update({
+      where: { id: req.auth!.userId },
+      data: {
+        name: body.name,
+        email: body.email?.toLowerCase().trim(),
+        phone: body.phone,
+        profilePicture
+      }
+    });
+  });
+  res.json(userDto(user));
+}));
+
+router.get("/eligible-clients", authenticate, requireRoles("ADMIN", "TEACHER"), asyncHandler(async (_req, res) => {
+  const now = new Date();
+  const users = await prisma.user.findMany({
+    where: {
+      role: "CLIENT",
+      monthlyStatus: "PAGADO",
+      membershipExpiresAt: { gt: now }
+    },
+    orderBy: { name: "asc" }
+  });
+  res.json(users.map(userDto));
+}));
+
+router.patch("/me/preferences", authenticate, validate({ body: notificationPreferencesBody }), asyncHandler(async (req, res) => {
+  if (!req.auth) throw new AppError(401, "AUTH_REQUIRED", "Authentication is required");
+  const body = req.body as z.infer<typeof notificationPreferencesBody>;
   const user = await prisma.user.update({
     where: { id: req.auth.userId },
-    data: {
-      name: body.name,
-      email: body.email?.toLowerCase().trim(),
-      phone: body.phone,
-      profilePicture
-    }
+    data: { classReminderEnabled: body.classReminderEnabled }
   });
   res.json(userDto(user));
 }));
@@ -158,18 +188,20 @@ router.put("/:id", authenticate, requireRoles("ADMIN"), validate({ params: idPar
   });
   const nextRole = body.role ?? current.role;
   const membership = normalizeMembership({ ...body, role: nextRole }, current);
-  const profilePicture = publicUploadUrl(req.file) ?? body.profilePicture ?? body.profile_picture;
-  const user = await prisma.user.update({
-    where: { id: params.id },
-    data: {
-      name: body.name,
-      email: body.email?.toLowerCase().trim(),
-      role: body.role,
-      monthlyStatus: membership.monthlyStatus,
-      membershipExpiresAt: membership.membershipExpiresAt,
-      phone: body.phone,
-      profilePicture
-    }
+  const user = await withPersistedProfileImage(req.file, async (uploadedProfilePicture) => {
+    const profilePicture = uploadedProfilePicture ?? body.profilePicture ?? body.profile_picture;
+    return prisma.user.update({
+      where: { id: params.id },
+      data: {
+        name: body.name,
+        email: body.email?.toLowerCase().trim(),
+        role: body.role,
+        monthlyStatus: membership.monthlyStatus,
+        membershipExpiresAt: membership.membershipExpiresAt,
+        phone: body.phone,
+        profilePicture
+      }
+    });
   });
   res.json(userDto(user));
 }));

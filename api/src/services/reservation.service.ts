@@ -29,7 +29,7 @@ type WaitlistCandidateRow = {
   user_id: number;
 };
 
-type PromotedUser = {
+export type PromotedUser = {
   userId: number;
   classId: number;
   classTitle: string;
@@ -48,11 +48,14 @@ export class ReservationService {
    * Creates or reactivates a reservation using a class-level DB lock.
    * The class row is the serialization point, preventing overbooking even under concurrent requests.
    */
-  async reserveClass(userId: number, classId: number, now = new Date()) {
+  async reserveClass(userId: number, classId: number, now = new Date(), hideName = false) {
     return this.db.$transaction(async (tx) => {
       const gymClass = await this.lockClass(tx, classId);
       if (!isAfter(gymClass.fecha_hora_inicio, now)) {
         throw new AppError(409, "CLASS_ALREADY_STARTED", "Cannot reserve a class that already started");
+      }
+      if (!isAfter(minutesBefore(gymClass.fecha_hora_inicio, 30), now)) {
+        throw new AppError(409, "RESERVATION_CLOSED", "Reservations close 30 minutes before class start");
       }
 
       const user = await tx.user.findUnique({
@@ -79,10 +82,17 @@ export class ReservationService {
       const reservation = existing
         ? await tx.reservation.update({
             where: { id: existing.id },
-            data: { status: nextStatus, requestedAt: now, promotedAt: null }
+            data: {
+              status: nextStatus,
+              requestedAt: now,
+              promotedAt: null,
+              hideName,
+              fixedEnrollment: false,
+              reminderSentAt: null
+            }
           })
         : await tx.reservation.create({
-            data: { userId, classId, status: nextStatus, requestedAt: now }
+            data: { userId, classId, status: nextStatus, requestedAt: now, hideName }
           });
 
       return { reservation, status: nextStatus };
@@ -128,8 +138,49 @@ export class ReservationService {
       return { cancelled, promoted };
     }, this.transactionOptions());
 
-    await this.notifyPromoted(result.promoted);
+    await this.notifyPromotedBestEffort(result.promoted);
     return result;
+  }
+
+  /** Changes only the authenticated client's privacy choice for an existing reservation. */
+  async setReservationPrivacy(userId: number, classId: number, hideName: boolean) {
+    const reservation = await this.db.reservation.findUnique({
+      where: { userId_classId: { userId, classId } },
+      select: { id: true, status: true }
+    });
+    if (!reservation || reservation.status === "CANCELADA") {
+      throw new AppError(404, "RESERVATION_NOT_FOUND", "Active reservation not found");
+    }
+
+    return this.db.reservation.update({
+      where: { id: reservation.id },
+      data: { hideName }
+    });
+  }
+
+  /** Promotes all eligible waitlisted users who fit after a capacity increase in the caller's transaction. */
+  async promoteWaitlistForCapacityIncrease(tx: TxClient, classId: number, now = new Date()) {
+    const gymClass = await this.lockClass(tx, classId);
+    return this.promoteWaitlistForLockedClass(tx, gymClass, now);
+  }
+
+  /** Push delivery happens after commit and must never change the committed operation's result. */
+  async notifyPromotedBestEffort(promoted: PromotedUser[]) {
+    for (const user of promoted) {
+      try {
+        await this.push.sendToUser(user.userId, {
+          title: "Class spot confirmed",
+          body: `A spot opened for ${user.classTitle}. Your reservation is now confirmed.`,
+          data: { classId: user.classId, type: "WAITLIST_PROMOTED" }
+        });
+      } catch (error) {
+        console.error("Push notification failed after committed waitlist promotion", {
+          userId: user.userId,
+          classId: user.classId,
+          errorType: error instanceof Error ? error.name : "UnknownError"
+        });
+      }
+    }
   }
 
   /**
@@ -152,7 +203,7 @@ export class ReservationService {
       }
 
       const standardDeadline = minutesBefore(gymClass.fecha_hora_inicio, 30);
-      const deadline = reservation.promotedAt && isAfter(reservation.promotedAt, standardDeadline)
+      const deadline = reservation.promotedAt && !isAfter(standardDeadline, reservation.promotedAt)
         ? gymClass.fecha_hora_inicio
         : standardDeadline;
       if (isAfter(now, deadline)) {
@@ -191,7 +242,7 @@ export class ReservationService {
       totals.noShows += result.noShows;
       totals.penaltiesCreated += result.penaltiesCreated;
       totals.promoted += result.promoted.length;
-      await this.notifyPromoted(result.promoted);
+      await this.notifyPromotedBestEffort(result.promoted);
     }
 
     if (totals.noShows > 0 || totals.promoted > 0 || totals.penaltiesCreated > 0) {
@@ -201,29 +252,52 @@ export class ReservationService {
     return totals;
   }
 
-  /**
-   * Cron job: sends a 45-minute reminder to confirmed reservations that have not validated attendance yet.
-   */
+  /** Sends one opt-in push reminder one hour before each confirmed booking. */
   async sendReservationReminders(now = new Date()) {
-    const windowStart = addMinutes(now, 45);
-    const windowEnd = addMinutes(now, 46);
+    const windowStart = addMinutes(now, 60);
+    const windowEnd = addMinutes(now, 61);
     const reservations = await this.db.reservation.findMany({
       where: {
-        status: "CONFIRMADA",
+        status: { in: ["CONFIRMADA", "ASISTENCIA_VALIDADA"] },
+        reminderSentAt: null,
+        user: { is: { classReminderEnabled: true } },
         gymClass: { startsAt: { gte: windowStart, lt: windowEnd } }
       },
       include: { gymClass: { select: { id: true, title: true, startsAt: true } } }
     });
 
+    let sent = 0;
+    let failed = 0;
     for (const reservation of reservations) {
-      await this.push.sendToUser(reservation.userId, {
-        title: "Class reminder",
-        body: `Your ${reservation.gymClass.title} class starts in 45 minutes. Validate your attendance.`,
-        data: { classId: reservation.gymClass.id, type: "CLASS_REMINDER" }
+      const claimedAt = new Date();
+      const claimed = await this.db.reservation.updateMany({
+        where: { id: reservation.id, reminderSentAt: null },
+        data: { reminderSentAt: claimedAt }
       });
+      if (claimed.count !== 1) continue;
+
+      try {
+        await this.push.sendToUser(reservation.userId, {
+          title: "Tu clase comienza en 1 hora",
+          body: `${reservation.gymClass.title} empieza dentro de una hora.`,
+          data: { classId: reservation.gymClass.id, type: "CLASS_REMINDER" }
+        });
+        sent += 1;
+      } catch (error) {
+        failed += 1;
+        await this.db.reservation.updateMany({
+          where: { id: reservation.id, reminderSentAt: claimedAt },
+          data: { reminderSentAt: null }
+        });
+        console.error("Class reminder push failed", {
+          userId: reservation.userId,
+          classId: reservation.gymClass.id,
+          errorType: error instanceof Error ? error.name : "UnknownError"
+        });
+      }
     }
 
-    return { sent: reservations.length };
+    return { sent, failed };
   }
 
   private async processMissedAttendanceForClass(classId: number, now: Date) {
@@ -241,7 +315,7 @@ export class ReservationService {
           status: "CONFIRMADA",
           OR: [
             { promotedAt: null },
-            { promotedAt: { lte: standardDeadline } }
+            { promotedAt: { lt: standardDeadline } }
           ]
         },
         select: { id: true, userId: true }
@@ -352,16 +426,6 @@ export class ReservationService {
 
     const actor = await tx.user.findUnique({ where: { id: input.actorUserId }, select: { id: true } });
     if (!actor) throw new AppError(404, "USER_NOT_FOUND", "Actor user not found");
-  }
-
-  private async notifyPromoted(promoted: PromotedUser[]) {
-    for (const user of promoted) {
-      await this.push.sendToUser(user.userId, {
-        title: "Class spot confirmed",
-        body: `A spot opened for ${user.classTitle}. Your reservation is now confirmed.`,
-        data: { classId: user.classId, type: "WAITLIST_PROMOTED" }
-      });
-    }
   }
 
   private transactionOptions() {

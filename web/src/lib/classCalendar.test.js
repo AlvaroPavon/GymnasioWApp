@@ -123,11 +123,11 @@ test('allows late promotions through every current DTO alias before class start'
   assert.equal(canValidateAttendance({
     status: 'CONFIRMADA',
     promotedAt: '2026-08-25T09:30:00.000Z'
-  }, startsAt, now), false);
+  }, startsAt, now), true);
   assert.equal(canValidateAttendance({
     status: 'CONFIRMADA',
-    promotedAt: '2026-08-25T09:30:00.001Z'
-  }, startsAt, now), true);
+    promotedAt: '2026-08-25T09:29:59.999Z'
+  }, startsAt, now), false);
   assert.equal(canValidateAttendance({
     status: 'CONFIRMADA',
     promotedAt: '2026-08-25T10:00:00.000Z'

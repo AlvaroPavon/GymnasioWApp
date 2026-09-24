@@ -1,7 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { buildClassUpdatePayload, selectedClassById } from './classPayload.js';
+import {
+  buildClassCreatePayload,
+  buildClassUpdatePayload,
+  instantToLocalDateTimeInput,
+  selectedClassById
+} from './classPayload.js';
 
 const formValues = {
   title: 'Yoga suave',
@@ -16,6 +21,14 @@ const formValues = {
   imageOverrideDirty: false
 };
 
+const createFormValues = {
+  title: 'Yoga suave',
+  classTypeId: '3',
+  maxCapacity: '12',
+  startTime: '2026-08-18T10:00',
+  endTime: '2026-08-18T11:00'
+};
+
 test('omits the per-class image override when another field is edited', () => {
   const payload = buildClassUpdatePayload(formValues);
   assert.equal('image_override_url' in payload, false);
@@ -23,6 +36,19 @@ test('omits the per-class image override when another field is edited', () => {
   assert.equal('image_url' in payload, false);
   assert.equal('effectiveImageUrl' in payload, false);
   assert.equal('imageOverrideUrl' in payload, false);
+});
+
+test('includes weekly repetition, assigned teacher and deduplicated fixed users on create', () => {
+  const payload = buildClassCreatePayload({
+    ...createFormValues,
+    teacherId: '8',
+    repeatWeeks: '6',
+    fixedUserIds: [11, '12', 11]
+  });
+
+  assert.equal(payload.teacher_id, 8);
+  assert.equal(payload.repeat_weeks, 6);
+  assert.deepEqual(payload.fixed_user_ids, [11, 12]);
 });
 
 test('sends a trimmed per-class image override after an explicit edit', () => {
@@ -90,104 +116,99 @@ test('reconciles an open class with refreshed capacity and participants by id', 
   assert.equal(selectedClassById(refreshedClasses, 99), null);
 });
 
-function runTimezoneScenario(timeZone, instants, editedLocalTime, invalidLocalTime, invalidOriginalInstant) {
-  const script = `
-    import { buildClassUpdatePayload, instantToLocalDateTimeInput } from './src/lib/classPayload.js';
+function buildPayload(flow, overrides = {}) {
+  if (flow === 'create') {
+    return buildClassCreatePayload({ ...createFormValues, ...overrides });
+  }
+  return buildClassUpdatePayload({ ...formValues, ...overrides });
+}
 
-    const values = {
-      title: 'Yoga suave',
-      classTypeId: '3',
-      teacherId: '8',
-      maxCapacity: '12'
-    };
-    const roundTrips = ${JSON.stringify(instants)}.map((instant) => {
-      const localDateTime = instantToLocalDateTimeInput(instant);
-      const payload = buildClassUpdatePayload({
-        ...values,
-        startTime: localDateTime,
-        endTime: localDateTime,
-        originalStartTime: instant,
-        originalEndTime: instant
-      });
-      return { instant, localDateTime, payloadInstant: payload.start_time };
+test('converts exact valid Europe/Madrid wall-clock times in create and edit payloads', () => {
+  for (const flow of ['create', 'edit']) {
+    const springBoundary = buildPayload(flow, {
+      startTime: '2026-03-29T01:59:59.999',
+      endTime: '2026-03-29T03:00'
     });
-    const editedPayload = buildClassUpdatePayload({
-      ...values,
-      startTime: ${JSON.stringify(editedLocalTime)},
-      endTime: ${JSON.stringify(editedLocalTime)}
+    assert.equal(springBoundary.start_time, '2026-03-29T00:59:59.999Z');
+    assert.equal(springBoundary.end_time, '2026-03-29T01:00:00.000Z');
+
+    const autumnBoundary = buildPayload(flow, {
+      startTime: '2026-10-25T01:59:59.999',
+      endTime: '2026-10-25T03:00'
     });
-    let invalidLocalTimeError = null;
-    try {
-      buildClassUpdatePayload({
-        ...values,
-        startTime: ${JSON.stringify(invalidLocalTime)},
-        endTime: ${JSON.stringify(invalidLocalTime)},
-        originalStartTime: ${JSON.stringify(invalidOriginalInstant)},
-        originalEndTime: ${JSON.stringify(invalidOriginalInstant)}
-      });
-    } catch (error) {
-      invalidLocalTimeError = error.name;
-    }
-    console.log(JSON.stringify({ roundTrips, editedInstant: editedPayload.start_time, invalidLocalTimeError }));
+    assert.equal(autumnBoundary.start_time, '2026-10-24T23:59:59.999Z');
+    assert.equal(autumnBoundary.end_time, '2026-10-25T02:00:00.000Z');
+  }
+});
+
+test('rejects the Europe/Madrid spring DST gap in create and edit payloads', () => {
+  for (const flow of ['create', 'edit']) {
+    assert.throws(
+      () => buildPayload(flow, {
+        startTime: '2026-03-29T02:30',
+        endTime: '2026-03-29T04:00'
+      }),
+      {
+        name: 'RangeError',
+        message: 'La fecha y hora seleccionadas no existen por el cambio de horario en Europe/Madrid.'
+      }
+    );
+  }
+});
+
+test('fails closed for the Europe/Madrid autumn DST overlap in create and edit payloads', () => {
+  for (const flow of ['create', 'edit']) {
+    assert.throws(
+      () => buildPayload(flow, {
+        startTime: '2026-10-25T02:30',
+        endTime: '2026-10-25T04:00'
+      }),
+      {
+        name: 'RangeError',
+        message: 'La fecha y hora seleccionadas son ambiguas por el cambio de horario en Europe/Madrid.'
+      }
+    );
+  }
+});
+
+test('requires end to be after start in create and edit payloads', () => {
+  for (const flow of ['create', 'edit']) {
+    assert.throws(
+      () => buildPayload(flow, {
+        startTime: '2026-08-18T10:00',
+        endTime: '2026-08-18T10:00'
+      }),
+      {
+        name: 'RangeError',
+        message: 'La hora de fin debe ser posterior a la hora de inicio.'
+      }
+    );
+  }
+});
+
+test('formats edit inputs in Europe/Madrid regardless of the process timezone', () => {
+  const script = `
+    import { instantToLocalDateTimeInput } from './src/lib/classPayload.js';
+    console.log(JSON.stringify([
+      instantToLocalDateTimeInput('2026-01-15T08:30:45.123Z'),
+      instantToLocalDateTimeInput('2026-07-15T08:30:45.123Z')
+    ]));
   `;
   const result = spawnSync(process.execPath, ['--input-type=module', '--eval', script], {
     cwd: process.cwd(),
     encoding: 'utf8',
-    env: { ...process.env, TZ: timeZone }
+    env: { ...process.env, TZ: 'America/New_York' }
   });
 
   assert.equal(result.status, 0, result.stderr);
-  return JSON.parse(result.stdout);
-}
-
-test('uses Europe/Madrid local components and preserves exact instants across DST changes', () => {
-  const instants = [
-    '2026-01-15T08:30:45.123Z',
-    '2026-07-15T08:30:45.123Z',
-    '2026-03-29T00:30:00.000Z',
-    '2026-03-29T01:30:00.000Z',
-    '2026-10-25T00:30:00.000Z',
-    '2026-10-25T01:30:00.000Z'
-  ];
-  const result = runTimezoneScenario(
-    'Europe/Madrid',
-    instants,
-    '2026-07-15T10:30:45.123',
-    '2026-03-29T02:30',
-    '2026-03-29T01:30:00.000Z'
-  );
-
-  assert.deepEqual(result.roundTrips.map(({ localDateTime }) => localDateTime), [
+  assert.deepEqual(JSON.parse(result.stdout), [
     '2026-01-15T09:30:45.123',
-    '2026-07-15T10:30:45.123',
-    '2026-03-29T01:30',
-    '2026-03-29T03:30',
-    '2026-10-25T02:30',
-    '2026-10-25T02:30'
+    '2026-07-15T10:30:45.123'
   ]);
-  assert.deepEqual(result.roundTrips.map(({ payloadInstant }) => payloadInstant), instants);
-  assert.equal(result.editedInstant, '2026-07-15T08:30:45.123Z');
-  assert.equal(result.invalidLocalTimeError, 'RangeError');
 });
 
-test('converts through local components in another timezone', () => {
-  const instants = [
-    '2026-01-15T08:30:45.123Z',
-    '2026-07-15T08:30:45.123Z'
-  ];
-  const result = runTimezoneScenario(
-    'America/New_York',
-    instants,
-    '2026-07-15T04:30:45.123',
-    '2026-03-08T02:30',
-    '2026-03-08T07:30:00.000Z'
-  );
-
-  assert.deepEqual(result.roundTrips.map(({ localDateTime }) => localDateTime), [
-    '2026-01-15T03:30:45.123',
-    '2026-07-15T04:30:45.123'
-  ]);
-  assert.deepEqual(result.roundTrips.map(({ payloadInstant }) => payloadInstant), instants);
-  assert.equal(result.editedInstant, '2026-07-15T08:30:45.123Z');
-  assert.equal(result.invalidLocalTimeError, 'RangeError');
+test('maps unambiguous Europe/Madrid instants back to the same wall-clock value', () => {
+  assert.equal(instantToLocalDateTimeInput('2026-03-29T00:59:59.999Z'), '2026-03-29T01:59:59.999');
+  assert.equal(instantToLocalDateTimeInput('2026-03-29T01:00:00.000Z'), '2026-03-29T03:00');
+  assert.equal(instantToLocalDateTimeInput('2026-10-25T02:00:00.000Z'), '2026-10-25T03:00');
 });

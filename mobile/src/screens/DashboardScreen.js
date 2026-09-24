@@ -1,12 +1,21 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
+import * as Notifications from 'expo-notifications';
 import { getApiBaseUrl } from '../api/config';
 import { connectRealtime } from '../api/realtime';
+import {
+  clearSessionState,
+  reconcileAuthoritativeSession,
+  setSessionAuthorization,
+  shouldRefreshAuthoritativeUser,
+  toSafeSessionUser
+} from '../auth/session';
 import { openPrivacyPolicy } from '../utils/privacyPolicy';
 import { prepareClassTypeImageAsset } from '../utils/classTypeImageUpload';
+import { buildClassSchedule, instantToClassDateTimeInput } from '../utils/classSchedule';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   activeMembership,
@@ -14,6 +23,7 @@ import {
   canValidate,
   canViewParticipantIdentities,
   capOf,
+  classReminderEnabled,
   dateInput,
   endOf,
   expiryOf,
@@ -28,13 +38,14 @@ import {
   pad,
   RESERVATION_STATUS_OPTIONS,
   reservationFor,
+  reservationHidesName,
+  reservationIsFixed,
   reservationLabel,
   reservationStatus,
   shiftDays,
   startOf,
   statusOf,
   teacherOf,
-  toIso as iso,
   typeOf,
   withExplicitImageOverride
 } from '../utils/activityCalendar';
@@ -59,7 +70,7 @@ const errorText = (e, fallback) => e?.response?.data?.error?.message || e?.respo
 const nextHourForm = () => {
   const start = new Date(Date.now() + 60 * 60 * 1000);
   const end = new Date(start.getTime() + 60 * 60 * 1000);
-  return { title: '', description: '', type: '', teacher: '', cap: '12', start: dateInput(start), end: dateInput(end), image: '' };
+  return { title: '', description: '', type: '', teacher: '', cap: '12', start: instantToClassDateTimeInput(start), end: instantToClassDateTimeInput(end), image: '', repeatWeeks: '1', fixedUserIds: [] };
 };
 const emptyUser = () => ({ name: '', email: '', password: '', role: 'CLIENT', monthly: 'IMPAGADO', expires: '', phone: '', photo: '' });
 
@@ -89,6 +100,10 @@ function Btn({ title, onPress, tone = 'blue', disabled }) {
 }
 function Chip({ text, onPress }) {
   return <TouchableOpacity accessibilityRole="button" onPress={onPress} style={styles.chip}><Text style={styles.chipText}>{text}</Text></TouchableOpacity>;
+}
+
+function PreferenceToggle({ label, description, value, onValueChange, disabled = false }) {
+  return <View style={styles.preferenceRow}><View style={styles.preferenceCopy}><Text style={styles.preferenceLabel}>{label}</Text><Text style={styles.preferenceDescription}>{description}</Text></View><Switch accessibilityLabel={label} disabled={disabled} value={!!value} onValueChange={onValueChange} trackColor={{ false: '#475569', true: '#ff806f' }} thumbColor={value ? '#fff' : '#cbd5e1'} /></View>;
 }
 
 function Sheet({ visible, title, onClose, children, compact = false, insets, bottomInset }) {
@@ -140,6 +155,7 @@ export default function DashboardScreen({ navigation }) {
   const [me, setMe] = useState(null);
   const [classes, setClasses] = useState([]);
   const [users, setUsers] = useState([]);
+  const [eligibleClients, setEligibleClients] = useState([]);
   const [types, setTypes] = useState([]);
   const [images, setImages] = useState([]);
   const [payments, setPayments] = useState([]);
@@ -162,8 +178,12 @@ export default function DashboardScreen({ navigation }) {
   const [loadError, setLoadError] = useState('');
   const [syncStatus, setSyncStatus] = useState('disconnected');
   const [notice, setNotice] = useState(null);
+  const [hideNameOnReserve, setHideNameOnReserve] = useState(false);
+  const [preferenceSaving, setPreferenceSaving] = useState(false);
   const noticeTimerRef = useRef(null);
   const activityDateAutoSelectedRef = useRef(false);
+  const authoritativeRefreshRef = useRef(null);
+  const logoutRef = useRef(null);
   const [classForm, setClassForm] = useState(nextHourForm());
   const [originalClassImageOverride, setOriginalClassImageOverride] = useState('');
   const [editingClass, setEditingClass] = useState(null);
@@ -199,7 +219,13 @@ export default function DashboardScreen({ navigation }) {
         if (cancelled || !token) return;
         cleanupRealtime = connectRealtime(
           token,
-          () => fetchAll(me.role, true),
+          (message) => {
+            if (shouldRefreshAuthoritativeUser(message)) {
+              void refreshAuthoritativeUser();
+              return;
+            }
+            void fetchAll(me.role, true);
+          },
           setSyncStatus
         );
       })
@@ -218,18 +244,96 @@ export default function DashboardScreen({ navigation }) {
   }, [classes]);
 
   const logout = async () => {
-    delete axios.defaults.headers.common.Authorization;
-    await AsyncStorage.multiRemove(['token', 'user', 'rememberLogin']);
-    navigation.replace('Login');
+    if (logoutRef.current) return logoutRef.current;
+
+    const operation = (async () => {
+      try {
+        await clearSessionState({ storage: AsyncStorage, httpClient: axios });
+      } finally {
+        navigation.replace('Login');
+      }
+    })();
+    logoutRef.current = operation;
+    return operation;
+  };
+
+  const resetRoleScopedState = (nextRole) => {
+    if (nextRole !== me?.role) {
+      setTab('classes');
+      setMenuOpen(false);
+      setClassFormOpen(false);
+      setTypeFormOpen(false);
+      setUserFormOpen(false);
+      setImageFormOpen(false);
+      setSettingsFormOpen(false);
+      setSelectedClass(null);
+      setEditingUser(null);
+      setUserForm(emptyUser());
+      setPasswordReset('');
+    }
+
+    if (nextRole !== 'ADMIN') {
+      setUsers([]);
+      setImages([]);
+      setPayments([]);
+      setNotes([]);
+    }
+    if (nextRole === 'CLIENT') setEligibleClients([]);
+  };
+
+  const refreshAuthoritativeUser = () => {
+    if (authoritativeRefreshRef.current) return authoritativeRefreshRef.current;
+
+    const operation = (async () => {
+      try {
+        const token = await AsyncStorage.getItem('token');
+        if (!token) {
+          await logout();
+          return null;
+        }
+
+        const session = await reconcileAuthoritativeSession({
+          storage: AsyncStorage,
+          httpClient: axios,
+          apiBaseUrl: getApiBaseUrl(),
+          token
+        });
+        if (session.status !== 'authenticated') {
+          await logout();
+          return null;
+        }
+
+        resetRoleScopedState(session.user.role);
+        setMe(session.user);
+        await fetchAll(session.user.role, true);
+        return session.user;
+      } catch (error) {
+        setLoadError(errorText(error, 'No se pudo actualizar la sesión.'));
+        return null;
+      }
+    })();
+
+    authoritativeRefreshRef.current = operation;
+    void operation.finally(() => {
+      if (authoritativeRefreshRef.current === operation) {
+        authoritativeRefreshRef.current = null;
+      }
+    });
+    return operation;
   };
 
   const loadSession = async () => {
     try {
-      const token = await AsyncStorage.getItem('token');
-      const rawUser = await AsyncStorage.getItem('user');
+      const [token, rawUser, storedPrivacy] = await Promise.all([
+        AsyncStorage.getItem('token'),
+        AsyncStorage.getItem('user'),
+        AsyncStorage.getItem('hideNameOnReserve')
+      ]);
       if (!token || !rawUser) return navigation.replace('Login');
-      const storedUser = JSON.parse(rawUser);
-      axios.defaults.headers.common.Authorization = `Bearer ${token}`;
+      const storedUser = toSafeSessionUser(JSON.parse(rawUser));
+      setSessionAuthorization(axios, token);
+      await AsyncStorage.setItem('user', JSON.stringify(storedUser));
+      setHideNameOnReserve(storedPrivacy === 'true');
       setMe(storedUser);
       await fetchAll(storedUser.role, true);
     } catch {
@@ -244,14 +348,19 @@ export default function DashboardScreen({ navigation }) {
     if (!role) return;
     try {
       if (!silent) setLoading(true);
-      const [classRes, typeRes, settingsRes] = await Promise.all([
+      if (role !== 'ADMIN') {
+        setUsers([]); setImages([]); setPayments([]); setNotes([]);
+      }
+      const [classRes, typeRes, settingsRes, eligibleRes] = await Promise.all([
         axios.get(url('/classes')),
         axios.get(url('/class-types')),
-        axios.get(url('/settings'))
+        axios.get(url('/settings')),
+        role === 'CLIENT' ? Promise.resolve({ data: [] }) : axios.get(url('/users/eligible-clients'))
       ]);
       setClasses(classRes.data || []);
       setTypes(typeRes.data || []);
       setSettings(settingsRes.data || null);
+      setEligibleClients(eligibleRes.data || []);
       setLoadError('');
       setSettingsForm({ appName: settingsRes.data?.app_name || settingsRes.data?.appName || 'Ronquillo Te Cuida', heroImage: settingsRes.data?.hero_image || settingsRes.data?.heroImage || '' });
       if (role === 'ADMIN') {
@@ -282,7 +391,11 @@ export default function DashboardScreen({ navigation }) {
     }, 2600);
   };
 
-  const refresh = async () => { setRefreshing(true); await fetchAll(me?.role, true); setRefreshing(false); };
+  const refresh = async () => {
+    setRefreshing(true);
+    await refreshAuthoritativeUser();
+    setRefreshing(false);
+  };
   const refreshClassesAndTypes = async () => {
     const [classRes, typeRes] = await Promise.all([
       axios.get(url('/classes')),
@@ -305,7 +418,7 @@ export default function DashboardScreen({ navigation }) {
       let payload = {
         title: classForm.title.trim(), description: classForm.description.trim() || undefined,
         tipo_clase_id: classForm.type ? Number(classForm.type) : undefined,
-        max_capacity: Number(classForm.cap), start_time: iso(classForm.start, 'Inicio'), end_time: iso(classForm.end, 'Fin')
+        max_capacity: Number(classForm.cap), ...buildClassSchedule(classForm.start, classForm.end)
       };
       payload = withExplicitImageOverride(payload, {
         isEditing: !!editingClass,
@@ -313,11 +426,22 @@ export default function DashboardScreen({ navigation }) {
         originalValue: originalClassImageOverride
       });
       if (!payload.title || !payload.max_capacity) throw new Error('Título y aforo son obligatorios.');
-      if (new Date(payload.end_time) <= new Date(payload.start_time)) throw new Error('La hora de fin debe ser posterior al inicio.');
       if (me?.role === 'ADMIN') payload.teacher_id = Number(classForm.teacher);
       if (me?.role === 'ADMIN' && !payload.teacher_id) throw new Error('Selecciona un profesor.');
-      if (editingClass) await axios.put(url(`/classes/${editingClass}`), payload); else await axios.post(url('/classes'), payload);
-      showNotice(editingClass ? 'Clase actualizada.' : 'Clase creada.');
+      let response;
+      if (editingClass) {
+        response = await axios.put(url(`/classes/${editingClass}`), payload);
+      } else {
+        const repeatWeeks = Number(classForm.repeatWeeks);
+        const fixedUserIds = [...new Set((classForm.fixedUserIds || []).map(Number))];
+        if (!Number.isInteger(repeatWeeks) || repeatWeeks < 1 || repeatWeeks > 52) throw new Error('Las semanas deben estar entre 1 y 52.');
+        if (fixedUserIds.length > payload.max_capacity) throw new Error('Los usuarios fijos no pueden superar el aforo.');
+        payload.repeat_weeks = repeatWeeks;
+        payload.fixed_user_ids = fixedUserIds;
+        response = await axios.post(url('/classes'), payload);
+      }
+      const createdCount = Number(response?.data?.createdCount ?? response?.data?.created_count ?? 1);
+      showNotice(editingClass ? 'Clase actualizada.' : createdCount > 1 ? `${createdCount} clases creadas.` : 'Clase creada.');
       resetClass(); await fetchAll(me?.role, true);
     } catch (e) { Alert.alert('Error', errorText(e, e.message || 'No se pudo guardar la clase.')); }
   };
@@ -326,7 +450,7 @@ export default function DashboardScreen({ navigation }) {
     const imageOverride = imageOverrideOf(c);
     setEditingClass(c.id);
     setOriginalClassImageOverride(imageOverride);
-    setClassForm({ title: c.title || '', description: c.description || '', type: typeOf(c) ? String(typeOf(c)) : '', teacher: teacherOf(c) ? String(teacherOf(c)) : '', cap: String(capOf(c)), start: dateInput(startOf(c)), end: dateInput(endOf(c)), image: imageOverride });
+    setClassForm({ title: c.title || '', description: c.description || '', type: typeOf(c) ? String(typeOf(c)) : '', teacher: teacherOf(c) ? String(teacherOf(c)) : '', cap: String(capOf(c)), start: instantToClassDateTimeInput(startOf(c)), end: instantToClassDateTimeInput(endOf(c)), image: imageOverride, repeatWeeks: '1', fixedUserIds: [] });
     setClassFormOpen(true);
   };
   const deleteClass = (id) => Alert.alert('Eliminar clase', '¿Seguro?', [{ text: 'Cancelar', style: 'cancel' }, { text: 'Eliminar', style: 'destructive', onPress: async () => { try { await axios.delete(url(`/classes/${id}`)); await fetchAll(me?.role, true); } catch (e) { Alert.alert('Error', errorText(e, 'No se pudo eliminar.')); } } }]);
@@ -460,7 +584,47 @@ export default function DashboardScreen({ navigation }) {
       setTypeImageUploading(false);
     }
   };
-  const reserve = async (classId, cancel) => { try { const r = await axios.post(url(`/classes/${classId}/${cancel ? 'cancel' : 'reserve'}`)); showNotice(cancel ? 'Reserva cancelada.' : r.data?.status === 'EN_ESPERA' ? 'Quedaste en lista de espera.' : 'Reserva confirmada.'); await fetchAll(me?.role, true); } catch (e) { Alert.alert('Error', errorText(e, 'Operación fallida.')); } };
+  const setReservationPrivacyDefault = async (value) => {
+    setHideNameOnReserve(value);
+    await AsyncStorage.setItem('hideNameOnReserve', value ? 'true' : 'false');
+  };
+  const toggleFixedClient = (userId) => setClassForm((current) => {
+    const selected = current.fixedUserIds || [];
+    return {
+      ...current,
+      fixedUserIds: selected.includes(userId)
+        ? selected.filter((id) => id !== userId)
+        : [...selected, userId]
+    };
+  });
+  const reserve = async (classId, cancel) => { try { const r = await axios.post(url(`/classes/${classId}/${cancel ? 'cancel' : 'reserve'}`), cancel ? undefined : { hideName: hideNameOnReserve }); showNotice(cancel ? 'Reserva cancelada.' : r.data?.status === 'EN_ESPERA' ? 'Quedaste en lista de espera.' : 'Reserva confirmada.'); await fetchAll(me?.role, true); } catch (e) { Alert.alert('Error', errorText(e, 'Operación fallida.')); } };
+  const updateReservationPrivacy = async (classId, hideName) => { try { await axios.patch(url(`/classes/${classId}/reservations/privacy`), { hideName }); showNotice(hideName ? 'Tu nombre quedará oculto para otros usuarios.' : 'Tu nombre volverá a mostrarse.'); await fetchAll(me?.role, true); } catch (e) { Alert.alert('Error', errorText(e, 'No se pudo actualizar la privacidad.')); } };
+  const ensurePushRegistration = async () => {
+    const currentPermission = await Notifications.getPermissionsAsync();
+    const permission = currentPermission.granted ? currentPermission : await Notifications.requestPermissionsAsync();
+    if (!permission.granted) throw new Error('Activa las notificaciones en los ajustes del dispositivo para recibir recordatorios.');
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('default', { name: 'Recordatorios de clases', importance: Notifications.AndroidImportance.MAX });
+    }
+    const pushToken = (await Notifications.getExpoPushTokenAsync()).data;
+    await axios.post(url('/push-devices'), { pushToken, platform: Platform.OS === 'ios' ? 'IOS' : 'ANDROID' });
+  };
+  const updateReminderPreference = async (enabled) => {
+    if (preferenceSaving) return;
+    setPreferenceSaving(true);
+    try {
+      if (enabled) await ensurePushRegistration();
+      const response = await axios.patch(url('/users/me/preferences'), { classReminderEnabled: enabled });
+      const updatedUser = toSafeSessionUser(response.data);
+      setMe(updatedUser);
+      await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
+      showNotice(enabled ? 'Te avisaremos una hora antes de cada clase.' : 'Recordatorios de clase desactivados.');
+    } catch (e) {
+      Alert.alert('Notificaciones', errorText(e, 'No se pudo actualizar el recordatorio.'));
+    } finally {
+      setPreferenceSaving(false);
+    }
+  };
   const validateAttendance = async (classId) => { try { await axios.post(url(`/classes/${classId}/attendance/validate`)); showNotice('Asistencia validada.'); await fetchAll(me?.role, true); } catch (e) { Alert.alert('Error', errorText(e, 'No se pudo validar.')); } };
   const reportPayment = async () => { try { await axios.post(url('/membership/payments'), { notes: 'Payment reported from mobile app' }); showNotice('Pago notificado al administrador.'); } catch (e) { Alert.alert('Error', errorText(e, 'No se pudo notificar.')); } };
 
@@ -612,11 +776,15 @@ export default function DashboardScreen({ navigation }) {
     const full = (gymClass._count?.reservations || 0) >= capOf(gymClass);
     const image = imgOf(gymClass);
     const upcoming = new Date(startsAt).getTime() >= Date.now();
-    const participantReservations = canManageParticipants && Array.isArray(gymClass.reservations) ? gymClass.reservations : [];
+    const participantReservations = Array.isArray(gymClass.reservations) ? gymClass.reservations : [];
     const confirmed = participantReservations.filter((r) => ['CONFIRMADA', 'ASISTENCIA_VALIDADA'].includes(reservationStatus(r)));
     const waitlist = participantReservations.filter((r) => reservationStatus(r) === 'EN_ESPERA');
     const noShows = participantReservations.filter((r) => reservationStatus(r) === 'NO_ASISTE');
-    const renderReservations = (title, data) => <View style={styles.box}><Text style={styles.subtitle}>{title}</Text>{data.length ? data.map((r) => <TouchableOpacity key={`${title}-${r.id ?? r.user?.id ?? r.userId}-${reservationStatus(r)}`} onPress={() => openReservationUser(r.user)} style={styles.student}><View style={styles.avatar}><Text style={styles.avatarText}>{(r.user?.name || '?').charAt(0)}</Text></View><View style={{ flex: 1 }}><Text style={styles.text}>{r.user?.name || 'Usuario'}</Text><Text style={styles.muted}>{reservationLabel(reservationStatus(r))}</Text></View>{reservationStatus(r) !== 'NO_ASISTE' && (r.user?.id ?? r.userId ?? r.user_id) ? <Btn title="Quitar" tone="red" onPress={() => removeStudent(gymClass.id, r.user?.id ?? r.userId ?? r.user_id)} /> : null}</TouchableOpacity>) : <Text style={styles.muted}>Sin registros.</Text>}</View>;
+    const renderReservations = (title, data) => <View style={styles.box}><Text style={styles.subtitle}>{title}</Text>{data.length ? data.map((r) => {
+      const participantName = r.user?.name || 'Usuario anónimo';
+      const participantId = r.user?.id ?? r.userId ?? r.user_id;
+      return <TouchableOpacity disabled={!canManageParticipants || !participantId} key={`${title}-${r.id ?? participantId ?? participantName}-${reservationStatus(r)}`} onPress={() => openReservationUser(r.user)} style={styles.student}><View style={[styles.avatar, !participantId && styles.avatarAnonymous]}><Text style={styles.avatarText}>{participantName.charAt(0)}</Text></View><View style={{ flex: 1 }}><Text style={styles.text}>{participantName}</Text><Text style={styles.muted}>{reservationLabel(reservationStatus(r))}{reservationIsFixed(r) ? ' · Fijo' : ''}</Text></View>{canManageParticipants && reservationStatus(r) !== 'NO_ASISTE' && participantId ? <Btn title="Quitar" tone="red" onPress={() => removeStudent(gymClass.id, participantId)} /> : null}</TouchableOpacity>;
+    }) : <Text style={styles.muted}>Sin registros.</Text>}</View>;
     return <Sheet insets={insets} bottomInset={bottomInset} visible={!!gymClass} title="Detalle de clase" onClose={closeClassDetails}>
       <View style={styles.card}>
         {!!image && <Image source={{ uri: image }} style={styles.classImage} />}
@@ -627,9 +795,10 @@ export default function DashboardScreen({ navigation }) {
         {(isAdmin || isTeacher) && <View style={styles.row}><Btn title="Editar clase" onPress={() => { closeClassDetails(); fillClass(gymClass); }} />{isAdmin && <Btn title="Eliminar" tone="red" onPress={() => { closeClassDetails(); deleteClass(gymClass.id); }} />}</View>}
         {isClient && upcoming && (!reserved || canCancelOwnReservation) ? <View style={styles.row}>{reserved ? <>{canValidate(reserved, startsAt) && <Btn title="Validar asistencia" tone="green" onPress={() => validateAttendance(gymClass.id)} />}<Btn title="Cancelar reserva" tone="red" onPress={() => reserve(gymClass.id, true)} /></> : <Btn title={!activeMembership(me) ? 'Renueva tu cuota' : full ? 'Unirse a lista de espera' : 'Reservar plaza'} tone={full ? 'yellow' : 'blue'} disabled={!activeMembership(me)} onPress={() => reserve(gymClass.id, false)} />}</View> : null}
         {!!reserved && <Text style={styles.pill}>{reservationLabel(reservationStatus(reserved))}</Text>}
+        {isClient && canCancelOwnReservation ? <View style={styles.preferenceInset}><PreferenceToggle label="Ocultar mi nombre" description="Los demás usuarios verán “Usuario anónimo”. El personal del centro seguirá viendo tu identidad." value={reservationHidesName(reserved)} onValueChange={(value) => updateReservationPrivacy(gymClass.id, value)} /></View> : null}
       </View>
+      {renderReservations('Asistentes confirmados', confirmed)}
       {canManageParticipants ? <>
-        {renderReservations('Asistentes confirmados', confirmed)}
         {renderReservations('Lista de espera', waitlist)}
         {renderReservations('No asistieron', noShows)}
       </> : null}
@@ -646,9 +815,18 @@ export default function DashboardScreen({ navigation }) {
     <Input label="Aforo" value={classForm.cap} onChangeText={(v) => setClassForm({ ...classForm, cap: v })} keyboardType="number-pad" />
     <Input label="Inicio" value={classForm.start} onChangeText={(v) => setClassForm({ ...classForm, start: v })} placeholder="2026-06-01T18:00" />
     <Input label="Fin" value={classForm.end} onChangeText={(v) => setClassForm({ ...classForm, end: v })} placeholder="2026-06-01T19:00" />
+    {!editingClass ? <>
+      <Input label="Repetir semanas (1-52)" value={classForm.repeatWeeks} onChangeText={(v) => setClassForm({ ...classForm, repeatWeeks: v })} keyboardType="number-pad" />
+      <Text style={styles.label}>USUARIOS FIJOS</Text>
+      <Text style={styles.fieldHint}>Quedarán confirmados automáticamente en cada semana creada. Solo aparecen clientes con cuota activa.</Text>
+      {eligibleClients.length ? <View style={styles.fixedClientList}>{eligibleClients.map((client) => {
+        const selected = (classForm.fixedUserIds || []).includes(client.id);
+        return <TouchableOpacity accessibilityRole="checkbox" accessibilityState={{ checked: selected }} key={client.id} onPress={() => toggleFixedClient(client.id)} style={[styles.fixedClient, selected && styles.fixedClientSelected]}><View style={[styles.selectionMark, selected && styles.selectionMarkSelected]}><Text style={styles.selectionMarkText}>{selected ? '✓' : ''}</Text></View><View style={{ flex: 1 }}><Text style={styles.text}>{client.name}</Text><Text numberOfLines={1} style={styles.muted}>{client.email}</Text></View></TouchableOpacity>;
+      })}</View> : <Text style={styles.fieldHint}>No hay clientes con cuota activa disponibles.</Text>}
+    </> : null}
     <Input label="URL imagen propia (opcional)" value={classForm.image} onChangeText={(v) => setClassForm({ ...classForm, image: v })} />
     {editingClass ? <Text style={styles.fieldHint}>La imagen efectiva del tipo se usa solo para mostrar. Esta URL se envía únicamente si la cambiás.</Text> : null}
-    <View style={styles.row}><Btn title={editingClass ? 'Guardar' : 'Crear'} onPress={saveClass} /><Btn title="Cerrar" tone="gray" onPress={resetClass} /></View>
+    <View style={styles.row}><Btn title={editingClass ? 'Guardar' : Number(classForm.repeatWeeks) > 1 ? `Crear ${classForm.repeatWeeks} clases` : 'Crear'} onPress={saveClass} /><Btn title="Cerrar" tone="gray" onPress={resetClass} /></View>
   </View> : null;
 
   const selectedType = types.find((classType) => String(classType.id) === String(selectedTypeId)) || null;
@@ -713,6 +891,11 @@ export default function DashboardScreen({ navigation }) {
         showsAllDates={activityView !== 'calendar'}
       />
       <FiltersSheet />
+      {isClient ? <View style={styles.preferenceCard}>
+        <PreferenceToggle label="Recordatorio una hora antes" description="Recibe una notificación en este dispositivo antes de cada clase reservada." value={classReminderEnabled(me)} disabled={preferenceSaving} onValueChange={updateReminderPreference} />
+        <View style={styles.preferenceDivider} />
+        <PreferenceToggle label="Reservar como anónimo" description="Se aplicará a tus próximas reservas. Puedes cambiarlo después en cada clase." value={hideNameOnReserve} onValueChange={setReservationPrivacyDefault} />
+      </View> : null}
       {isClient && !activeMembership(me) ? (
         <ActivityMessage
           title="Cuota no activa"
@@ -879,12 +1062,25 @@ const styles = StyleSheet.create({
   title: { color: '#fff', fontSize: 18, fontWeight: '900', marginBottom: 12 }, section: { color: '#fff', fontSize: 19, fontWeight: '900', marginVertical: 14 }, classTitle: { color: '#fff', fontSize: 17, fontWeight: '900' }, subtitle: { color: '#e2e8f0', fontSize: 12, fontWeight: '900', textTransform: 'uppercase', marginBottom: 8 }, text: { color: '#cbd5e1', fontSize: 14, lineHeight: 20 }, muted: { color: '#94a3b8', fontSize: 12, lineHeight: 18 }, empty: { color: '#94a3b8', textAlign: 'center', padding: 18 }, dashboardFooter: { alignItems: 'center', marginTop: 22, marginBottom: 4 }, dashboardCopyright: { color: '#64748b', fontSize: 11, fontWeight: '700', textAlign: 'center' }, dashboardPrivacyLink: { color: '#94a3b8', fontSize: 11, fontWeight: '800', marginTop: 5, textAlign: 'center', textDecorationLine: 'underline' },
   field: { marginBottom: 11 }, label: { color: '#cbd5e1', fontSize: 12, fontWeight: '900', marginBottom: 6, textTransform: 'uppercase' }, input: { minHeight: 48, backgroundColor: '#0f172a', color: '#f8fafc', borderWidth: 1, borderColor: '#334155', borderRadius: 12, padding: 12, fontSize: 15 }, area: { minHeight: 82, textAlignVertical: 'top' }, fieldHint: { color: '#94a3b8', fontSize: 12, lineHeight: 18, marginTop: -3, marginBottom: 12 },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }, switchRow: { flexDirection: 'row', gap: 8, backgroundColor: '#020617', borderRadius: 14, padding: 4, marginBottom: 14 },
+  preferenceCard: { backgroundColor: '#1c1c1e', borderRadius: 18, padding: 14, marginTop: 14, marginBottom: 4, borderWidth: 1, borderColor: '#2f2f32' },
+  preferenceRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  preferenceCopy: { flex: 1 },
+  preferenceLabel: { color: '#f4f4f5', fontSize: 14, lineHeight: 19, fontWeight: '900' },
+  preferenceDescription: { color: '#8f8f95', fontSize: 12, lineHeight: 17, marginTop: 3 },
+  preferenceDivider: { height: 1, backgroundColor: '#323236', marginVertical: 13 },
+  preferenceInset: { marginTop: 14, paddingTop: 13, borderTopWidth: 1, borderTopColor: '#334155' },
+  fixedClientList: { gap: 8, marginBottom: 12 },
+  fixedClient: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 13, padding: 10, backgroundColor: '#0f172a', borderWidth: 1, borderColor: '#334155' },
+  fixedClientSelected: { backgroundColor: '#25213a', borderColor: '#ff806f' },
+  selectionMark: { width: 24, height: 24, borderRadius: 7, borderWidth: 2, borderColor: '#64748b', alignItems: 'center', justifyContent: 'center' },
+  selectionMarkSelected: { backgroundColor: '#ff5a47', borderColor: '#ff5a47' },
+  selectionMarkText: { color: '#fff', fontSize: 15, lineHeight: 18, fontWeight: '900' },
   infoGrid: { flexDirection: 'row', gap: 8, marginTop: 12 },
   infoBox: { flex: 1, backgroundColor: '#0f172a', borderWidth: 1, borderColor: '#334155', borderRadius: 14, padding: 12 },
   btn: { minHeight: 46, backgroundColor: '#2563eb', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 23, alignItems: 'center', justifyContent: 'center', flexGrow: 1 }, btnText: { color: '#fff', fontWeight: '900', fontSize: 13 }, btn_blue: { backgroundColor: '#2563eb' }, btn_red: { backgroundColor: '#8d3040' }, btn_green: { backgroundColor: '#168a62' }, btn_yellow: { backgroundColor: '#f5c44d' }, btn_gray: { backgroundColor: '#303034' }, btn_coral: { backgroundColor: '#ff5a47' }, btn_light: { backgroundColor: '#f5f5f6' }, disabled: { opacity: 0.55 }, dark: { color: '#0f172a' },
   chips: { gap: 8, marginBottom: 10 }, chip: { minHeight: 44, backgroundColor: '#0f172a', borderWidth: 1, borderColor: '#334155', borderRadius: 999, paddingHorizontal: 12, justifyContent: 'center' }, chipText: { color: '#bfdbfe', fontWeight: '900', fontSize: 12 },
   header: { flexDirection: 'row', gap: 10, justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }, badge: { backgroundColor: '#0f172a', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: '#334155' }, badgeText: { color: '#10b981', fontWeight: '900' }, classImage: { width: '100%', height: 145, borderRadius: 14, marginBottom: 10, backgroundColor: '#0f172a' },
-  box: { marginTop: 12, padding: 12, borderRadius: 14, backgroundColor: '#0f172a', borderWidth: 1, borderColor: '#334155' }, student: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' }, avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#2563eb', alignItems: 'center', justifyContent: 'center' }, avatarText: { color: '#fff', fontWeight: '900' }, userImg: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#2563eb', alignItems: 'center', justifyContent: 'center' },
+  box: { marginTop: 12, padding: 12, borderRadius: 14, backgroundColor: '#0f172a', borderWidth: 1, borderColor: '#334155' }, student: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' }, avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#2563eb', alignItems: 'center', justifyContent: 'center' }, avatarAnonymous: { backgroundColor: '#475569' }, avatarText: { color: '#fff', fontWeight: '900' }, userImg: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#2563eb', alignItems: 'center', justifyContent: 'center' },
 
   compactMenu: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, paddingVertical: 8, backgroundColor: '#101010', borderBottomWidth: 1, borderBottomColor: '#242424' },
   menuButton: { flex: 1, backgroundColor: '#1e293b', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: '#334155' },

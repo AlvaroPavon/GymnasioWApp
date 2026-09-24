@@ -45,7 +45,7 @@ export function canValidateAttendance(reservation, startTime, now = new Date()) 
 
   const promotedAt = timestampOf(promotedAtOf(reservation));
   return Number.isFinite(promotedAt)
-    && promotedAt > startsAt - ATTENDANCE_CUTOFF_MS
+    && promotedAt >= startsAt - ATTENDANCE_CUTOFF_MS
     && promotedAt < startsAt;
 }
 

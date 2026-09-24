@@ -19,6 +19,12 @@ import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from "expo-notifications";
 import { getApiBaseUrl } from "../src/api/config";
+import {
+  clearSessionState,
+  reconcileAuthoritativeSession,
+  setSessionAuthorization
+} from "../src/auth/session";
+import { classReminderEnabled } from "../src/utils/activityCalendar";
 import { openPrivacyPolicy } from "../src/utils/privacyPolicy";
 
 const brandLogo = require("../assets/logo.jpg");
@@ -67,22 +73,47 @@ export default function LoginScreen({ navigation }) {
 
         if (remember !== "true") {
           if (remember === "false") {
-            await AsyncStorage.multiRemove(["token", "user"]);
+            await clearSessionState({
+              storage: AsyncStorage,
+              httpClient: axios,
+              preserveRememberPreference: true
+            });
           }
           return;
         }
 
-        const [token, rawUser] = await Promise.all([
-          AsyncStorage.getItem("token"),
-          AsyncStorage.getItem("user")
-        ]);
+        const token = await AsyncStorage.getItem("token");
+        if (!active) return;
 
-        if (!active || !token || !rawUser) return;
+        if (!token) {
+          await clearSessionState({
+            storage: AsyncStorage,
+            httpClient: axios,
+            preserveRememberPreference: true
+          });
+          return;
+        }
 
-        axios.defaults.headers.common.Authorization = `Bearer ${token}`;
-        navigation.replace("Dashboard");
-      } catch {
-        await AsyncStorage.multiRemove(["token", "user", "rememberLogin"]);
+        const session = await reconcileAuthoritativeSession({
+          storage: AsyncStorage,
+          httpClient: axios,
+          apiBaseUrl: getApiBaseUrl(),
+          token
+        });
+        if (active && session.status === "authenticated") {
+          if (classReminderEnabled(session.user)) {
+            await registerPushToken(token);
+          }
+          navigation.replace("Dashboard");
+        }
+      } catch (error) {
+        setSessionAuthorization(axios, null);
+        if (active) {
+          Alert.alert(
+            "No se pudo comprobar la sesión",
+            getApiErrorMessage(error, "Comprueba tu conexión e inténtalo de nuevo.")
+          );
+        }
       } finally {
         if (active) setCheckingSession(false);
       }
@@ -116,8 +147,8 @@ export default function LoginScreen({ navigation }) {
         },
         { headers: { Authorization: `Bearer ${accessToken}` } }
       );
-    } catch (error) {
-      console.log("Push registration skipped", error?.message);
+    } catch {
+      console.log("Push registration skipped.");
     }
   };
 
@@ -131,13 +162,22 @@ export default function LoginScreen({ navigation }) {
         password
       });
       const token = response.data.accessToken || response.data.token;
-      await AsyncStorage.setItem("token", token);
-      await AsyncStorage.setItem("user", JSON.stringify(response.data.user));
-      await AsyncStorage.setItem("rememberLogin", rememberMe ? "true" : "false");
-      axios.defaults.headers.common.Authorization = `Bearer ${token}`;
-      await registerPushToken(token);
+      const session = await reconcileAuthoritativeSession({
+        storage: AsyncStorage,
+        httpClient: axios,
+        apiBaseUrl: getApiBaseUrl(),
+        token,
+        rememberMe
+      });
+      if (session.status !== "authenticated") {
+        throw new Error("No se pudo validar la sesión.");
+      }
+      if (classReminderEnabled(session.user)) {
+        await registerPushToken(token);
+      }
       navigation.replace("Dashboard");
     } catch (error) {
+      setSessionAuthorization(axios, null);
       Alert.alert("Error", getApiErrorMessage(error, "Credenciales inválidas"));
     } finally {
       setLoginLoading(false);

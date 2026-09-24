@@ -79,8 +79,6 @@ export default function EditClassModal({ isOpen, onClose, classData, onUpdate, u
         maxCapacity,
         startTime,
         endTime,
-        originalStartTime: classData.start_time,
-        originalEndTime: classData.end_time,
         imageOverrideUrl: imageOverride.value,
         imageOverrideDirty: imageOverride.dirty
       });

@@ -1,5 +1,7 @@
 const LOCAL_DATE_TIME_PATTERN = /^(\d{4,})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/;
-const CLASS_TIME_ZONE = 'Europe/Madrid';
+
+export const CLASS_TIME_ZONE = 'Europe/Madrid';
+
 const DAY_IN_MILLISECONDS = 24 * 60 * 60 * 1000;
 const OFFSET_SAMPLE_DAYS = [-2, -1, 0, 1, 2];
 const LOCAL_DATE_TIME_FORMATTER = new Intl.DateTimeFormat('en-GB-u-ca-gregory-nu-latn', {
@@ -23,6 +25,8 @@ function pad(value, length = 2) {
 }
 
 function parseLocalDateTime(value) {
+  if (typeof value !== 'string') throw new RangeError(INVALID_LOCAL_DATE_TIME_MESSAGE);
+
   const match = LOCAL_DATE_TIME_PATTERN.exec(value);
   if (!match) throw new RangeError(INVALID_LOCAL_DATE_TIME_MESSAGE);
 
@@ -50,10 +54,11 @@ function formatLocalDateTime(components) {
     ':',
     pad(components.minute)
   ].join('');
-  const { millisecond, second } = components;
 
-  if (millisecond !== 0) return `${base}:${pad(second)}.${pad(millisecond, 3)}`;
-  if (second !== 0) return `${base}:${pad(second)}`;
+  if (components.millisecond !== 0) {
+    return `${base}:${pad(components.second)}.${pad(components.millisecond, 3)}`;
+  }
+  if (components.second !== 0) return `${base}:${pad(components.second)}`;
   return base;
 }
 
@@ -108,8 +113,8 @@ function sameDateTime(left, right) {
 }
 
 function zoneOffsetAt(timestamp) {
-  const date = new Date(timestamp);
-  return utcTimestampFromComponents(localComponentsFromInstant(date)) - timestamp;
+  const instant = new Date(timestamp);
+  return utcTimestampFromComponents(localComponentsFromInstant(instant)) - timestamp;
 }
 
 function possibleInstantsForLocalDateTime(components) {
@@ -132,78 +137,31 @@ function possibleInstantsForLocalDateTime(components) {
   return [...candidates].sort((left, right) => left - right);
 }
 
-export function instantToLocalDateTimeInput(value) {
+function localDateTimeTimestamp(value) {
+  const candidates = possibleInstantsForLocalDateTime(parseLocalDateTime(value));
+  if (candidates.length === 0) throw new RangeError(NONEXISTENT_LOCAL_DATE_TIME_MESSAGE);
+  if (candidates.length > 1) throw new RangeError(AMBIGUOUS_LOCAL_DATE_TIME_MESSAGE);
+  return candidates[0];
+}
+
+export function instantToClassDateTimeInput(value) {
   if (!value) return '';
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) throw new RangeError(`Invalid instant: ${value}`);
+  if (Number.isNaN(date.getTime())) throw new RangeError(INVALID_LOCAL_DATE_TIME_MESSAGE);
   return formatLocalDateTime(localComponentsFromInstant(date));
 }
 
-export function localDateTimeToUtcIso(value) {
-  const components = parseLocalDateTime(value);
-  const candidates = possibleInstantsForLocalDateTime(components);
-  if (candidates.length === 0) throw new RangeError(NONEXISTENT_LOCAL_DATE_TIME_MESSAGE);
-  if (candidates.length > 1) throw new RangeError(AMBIGUOUS_LOCAL_DATE_TIME_MESSAGE);
-  return new Date(candidates[0]).toISOString();
+export function localClassDateTimeToUtcIso(value) {
+  return new Date(localDateTimeTimestamp(value)).toISOString();
 }
 
-function buildClassSchedule(startTime, endTime) {
-  const start_time = localDateTimeToUtcIso(startTime);
-  const end_time = localDateTimeToUtcIso(endTime);
-  if (new Date(end_time).getTime() <= new Date(start_time).getTime()) {
-    throw new RangeError(INVALID_CLASS_RANGE_MESSAGE);
-  }
-  return { start_time, end_time };
-}
+export function buildClassSchedule(startValue, endValue) {
+  const startTimestamp = localDateTimeTimestamp(startValue);
+  const endTimestamp = localDateTimeTimestamp(endValue);
+  if (endTimestamp <= startTimestamp) throw new RangeError(INVALID_CLASS_RANGE_MESSAGE);
 
-export function resolveClassTypeId(classTypeId, classTypes = []) {
-  const selectedId = Number(classTypeId);
-  if (Number.isInteger(selectedId) && selectedId > 0) return selectedId;
-
-  const generalClassType = classTypes.find((type) => type.name?.trim().toLocaleLowerCase('es') === 'general');
-  const generalClassTypeId = Number(generalClassType?.id);
-  if (Number.isInteger(generalClassTypeId) && generalClassTypeId > 0) return generalClassTypeId;
-
-  throw new RangeError('A concrete class type is required');
-}
-
-export function buildClassCreatePayload(values) {
-  const payload = {
-    title: values.title,
-    tipo_clase_id: values.classTypeId ? Number(values.classTypeId) : undefined,
-    max_capacity: Number(values.maxCapacity),
-    ...buildClassSchedule(values.startTime, values.endTime)
+  return {
+    start_time: new Date(startTimestamp).toISOString(),
+    end_time: new Date(endTimestamp).toISOString()
   };
-
-  if (values.teacherId) payload.teacher_id = Number(values.teacherId);
-  if (values.repeatWeeks) payload.repeat_weeks = Number(values.repeatWeeks);
-  if (Array.isArray(values.fixedUserIds) && values.fixedUserIds.length > 0) {
-    payload.fixed_user_ids = [...new Set(values.fixedUserIds.map(Number))];
-  }
-
-  return payload;
-}
-
-export function buildClassUpdatePayload(values) {
-  const classTypeId = resolveClassTypeId(values.classTypeId, values.classTypes);
-
-  const payload = {
-    title: values.title,
-    tipo_clase_id: classTypeId,
-    teacher_id: values.teacherId ? Number(values.teacherId) : undefined,
-    max_capacity: Number(values.maxCapacity),
-    ...buildClassSchedule(values.startTime, values.endTime)
-  };
-
-  if (values.imageOverrideDirty === true) {
-    const explicitImageOverride = values.imageOverrideUrl?.trim();
-    payload.image_override_url = explicitImageOverride || null;
-  }
-
-  return payload;
-}
-
-export function selectedClassById(classes, selectedClassId) {
-  if (selectedClassId === null || selectedClassId === undefined) return null;
-  return classes.find((gymClass) => gymClass.id === selectedClassId) ?? null;
 }

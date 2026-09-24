@@ -2,8 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   canValidate,
+  classReminderEnabled,
   filterActivities,
   nearestClassDate,
+  reservationHidesName,
+  reservationIsFixed,
   sameDay
 } from './activityCalendar.js';
 
@@ -104,11 +107,11 @@ test('allows late promotions through every current DTO alias before class start'
   assert.equal(canValidate({
     status: 'CONFIRMADA',
     promotedAt: '2026-08-25T09:30:00.000Z'
-  }, startsAt, now), false);
+  }, startsAt, now), true);
   assert.equal(canValidate({
     status: 'CONFIRMADA',
-    promotedAt: '2026-08-25T09:30:00.001Z'
-  }, startsAt, now), true);
+    promotedAt: '2026-08-25T09:29:59.999Z'
+  }, startsAt, now), false);
   assert.equal(canValidate({
     status: 'CONFIRMADA',
     promotedAt: '2026-08-25T10:00:00.000Z'
@@ -126,4 +129,13 @@ test('rejects attendance at or after class start and fails closed for invalid da
   assert.equal(canValidate(reservation, startsAt, new Date('2026-08-25T10:00:00.001Z')), false);
   assert.equal(canValidate(reservation, 'invalid', new Date('2026-08-25T09:50:00.000Z')), false);
   assert.equal(canValidate({ ...reservation, promotedAt: 'invalid' }, startsAt, new Date('2026-08-25T09:50:00.000Z')), false);
+});
+
+test('normalizes enrollment privacy, fixed enrollment, and reminder aliases', () => {
+  assert.equal(reservationHidesName({ hide_name: true }), true);
+  assert.equal(reservationHidesName({ ocultar_nombre: false }), false);
+  assert.equal(reservationIsFixed({ fixed_enrollment: true }), true);
+  assert.equal(reservationIsFixed({ inscripcion_fija: false }), false);
+  assert.equal(classReminderEnabled({ class_reminder_enabled: true }), true);
+  assert.equal(classReminderEnabled({}), false);
 });

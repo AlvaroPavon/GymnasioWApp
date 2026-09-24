@@ -7,6 +7,7 @@ type AnyUser = {
   membershipExpiresAt?: Date | string | null;
   phone?: string | null;
   profilePicture?: string | null;
+  classReminderEnabled?: boolean;
   createdAt?: Date | string;
 };
 
@@ -30,6 +31,8 @@ type AnyClass = {
     status?: string;
     requestedAt?: Date | string;
     promotedAt?: Date | string | null;
+    hideName?: boolean;
+    fixedEnrollment?: boolean;
   }>;
   _count?: { reservations?: number };
 };
@@ -46,6 +49,7 @@ type ClassDtoOptions = {
   absoluteUrl?: UrlResolver;
   effectiveImageUrl?: string | null;
   viewerRole?: "ADMIN" | "TEACHER" | "CLIENT";
+  viewerUserId?: number;
 };
 
 export function userDto(user: AnyUser) {
@@ -61,6 +65,8 @@ export function userDto(user: AnyUser) {
     phone: user.phone ?? null,
     profilePicture: user.profilePicture ?? null,
     profile_picture: user.profilePicture ?? null,
+    classReminderEnabled: user.classReminderEnabled ?? false,
+    class_reminder_enabled: user.classReminderEnabled ?? false,
     createdAt: user.createdAt ?? null,
     created_at: user.createdAt ?? null
   };
@@ -73,6 +79,24 @@ export function publicTeacherDto(teacher: AnyUser) {
     role: teacher.role,
     profilePicture: teacher.profilePicture ?? null,
     profile_picture: teacher.profilePicture ?? null
+  };
+}
+
+export function publicAttendeeDto(user: AnyUser, hidden = false) {
+  if (hidden) {
+    return {
+      id: null,
+      name: "Usuario anónimo",
+      profilePicture: null,
+      profile_picture: null
+    };
+  }
+
+  return {
+    id: user.id,
+    name: user.name,
+    profilePicture: user.profilePicture ?? null,
+    profile_picture: user.profilePicture ?? null
   };
 }
 
@@ -93,18 +117,39 @@ export function classDto(gymClass: AnyClass, options: ClassDtoOptions = {}) {
   const effectiveImageUrl = absoluteUrl(
     options.effectiveImageUrl !== undefined ? options.effectiveImageUrl : gymClass.imageUrl
   );
-  const reservations = (gymClass.reservations ?? []).map((reservation) => ({
-    ...reservation,
-    status: reservation.status,
-    estado: reservation.status,
-    requestedAt: reservation.requestedAt,
-    requested_at: reservation.requestedAt,
-    fecha_solicitud: reservation.requestedAt,
-    promotedAt: reservation.promotedAt ?? null,
-    promoted_at: reservation.promotedAt ?? null,
-    promovida_en: reservation.promotedAt ?? null,
-    user: reservation.user ? userDto(reservation.user) : reservation.user
-  }));
+  const reservations = (gymClass.reservations ?? []).map((reservation) => {
+    const isClientViewer = options.viewerRole === "CLIENT";
+    const isOwnReservation = reservation.userId === options.viewerUserId;
+    const hideFromViewer = isClientViewer && !isOwnReservation && reservation.hideName === true;
+    const serializedUser = reservation.user
+      ? isClientViewer
+        ? publicAttendeeDto(reservation.user, hideFromViewer)
+        : userDto(reservation.user)
+      : reservation.user;
+
+    return {
+      id: reservation.id,
+      userId: hideFromViewer ? null : reservation.userId,
+      user_id: hideFromViewer ? null : reservation.userId,
+      classId: reservation.classId,
+      class_id: reservation.classId,
+      status: reservation.status,
+      estado: reservation.status,
+      requestedAt: reservation.requestedAt,
+      requested_at: reservation.requestedAt,
+      fecha_solicitud: reservation.requestedAt,
+      promotedAt: reservation.promotedAt ?? null,
+      promoted_at: reservation.promotedAt ?? null,
+      promovida_en: reservation.promotedAt ?? null,
+      hideName: reservation.hideName ?? false,
+      hide_name: reservation.hideName ?? false,
+      ocultar_nombre: reservation.hideName ?? false,
+      fixedEnrollment: reservation.fixedEnrollment ?? false,
+      fixed_enrollment: reservation.fixedEnrollment ?? false,
+      inscripcion_fija: reservation.fixedEnrollment ?? false,
+      user: serializedUser
+    };
+  });
 
   return {
     id: gymClass.id,

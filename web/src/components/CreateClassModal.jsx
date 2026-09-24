@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import axios from 'axios';
 import { API_URL, getApiErrorMessage } from '../lib/api';
+import { buildClassCreatePayload } from '../lib/classPayload';
 
 export default function CreateClassModal({ isOpen, onClose, onCreated, classTypes = [] }) {
   const dialogRef = useRef(null);
@@ -11,7 +12,30 @@ export default function CreateClassModal({ isOpen, onClose, onCreated, classType
   const [maxCapacity, setMaxCapacity] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
+  const [repeatWeeks, setRepeatWeeks] = useState('1');
+  const [eligibleClients, setEligibleClients] = useState([]);
+  const [fixedUserIds, setFixedUserIds] = useState([]);
+  const [clientsLoading, setClientsLoading] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    setClientsLoading(true);
+    axios.get(`${API_URL}/users/eligible-clients`)
+      .then((response) => {
+        if (active) setEligibleClients(response.data || []);
+      })
+      .catch(() => {
+        if (active) setEligibleClients([]);
+      })
+      .finally(() => {
+        if (active) setClientsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -48,19 +72,30 @@ export default function CreateClassModal({ isOpen, onClose, onCreated, classType
     setMaxCapacity('');
     setStartTime('');
     setEndTime('');
+    setRepeatWeeks('1');
+    setFixedUserIds([]);
+  };
+
+  const toggleFixedUser = (userId) => {
+    setFixedUserIds((current) => current.includes(userId)
+      ? current.filter((id) => id !== userId)
+      : [...current, userId]);
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     try {
       setLoading(true);
-      await axios.post(`${API_URL}/classes`, {
+      const payload = buildClassCreatePayload({
         title,
-        tipo_clase_id: classTypeId ? Number(classTypeId) : undefined,
-        max_capacity: Number(maxCapacity),
-        start_time: new Date(startTime).toISOString(),
-        end_time: new Date(endTime).toISOString()
+        classTypeId,
+        maxCapacity,
+        startTime,
+        endTime,
+        repeatWeeks,
+        fixedUserIds
       });
+      await axios.post(`${API_URL}/classes`, payload);
       resetForm();
       await onCreated?.();
       onClose();
@@ -91,7 +126,7 @@ export default function CreateClassModal({ isOpen, onClose, onCreated, classType
           initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.95, opacity: 0 }}
-          className="relative z-10 w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl"
+          className="custom-scrollbar relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl"
         >
           <button
             ref={closeButtonRef}
@@ -124,6 +159,12 @@ export default function CreateClassModal({ isOpen, onClose, onCreated, classType
               <input type="number" min="1" required value={maxCapacity} onChange={(event) => setMaxCapacity(event.target.value)} className="w-full rounded border border-slate-700 bg-slate-800 p-3 text-white focus-visible:outline-2 focus-visible:outline-blue-400" />
             </label>
 
+            <label className="grid gap-1 text-xs text-slate-400 md:col-span-2">
+              Repetición semanal
+              <input type="number" min="1" max="52" required value={repeatWeeks} onChange={(event) => setRepeatWeeks(event.target.value)} className="w-full rounded border border-slate-700 bg-slate-800 p-3 text-white focus-visible:outline-2 focus-visible:outline-blue-400" />
+              <span className="text-[11px] text-slate-500">1 crea solo esta clase; un valor mayor repite el mismo horario cada semana.</span>
+            </label>
+
             <label className="grid gap-1 text-xs text-slate-400">
               Inicio
               <input type="datetime-local" required value={startTime} onChange={(event) => setStartTime(event.target.value)} className="w-full rounded border border-slate-700 bg-slate-800 p-3 text-white focus-visible:outline-2 focus-visible:outline-blue-400" />
@@ -133,8 +174,32 @@ export default function CreateClassModal({ isOpen, onClose, onCreated, classType
               <input type="datetime-local" required value={endTime} onChange={(event) => setEndTime(event.target.value)} className="w-full rounded border border-slate-700 bg-slate-800 p-3 text-white focus-visible:outline-2 focus-visible:outline-blue-400" />
             </label>
 
+            <fieldset className="rounded-xl border border-slate-700 bg-slate-950/50 p-3 md:col-span-2">
+              <legend className="px-2 text-xs font-bold text-emerald-300">Alumnos fijos</legend>
+              <p className="mb-3 text-[11px] text-slate-500">Se reservarán automáticamente en todas las semanas creadas.</p>
+              {clientsLoading ? (
+                <p className="text-xs text-slate-400">Cargando alumnos…</p>
+              ) : eligibleClients.length > 0 ? (
+                <div className="grid max-h-40 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
+                  {eligibleClients.map((client) => (
+                    <label key={client.id} className="flex cursor-pointer items-center gap-2 rounded-lg bg-slate-800 p-2 text-xs text-slate-200">
+                      <input
+                        type="checkbox"
+                        checked={fixedUserIds.includes(client.id)}
+                        onChange={() => toggleFixedUser(client.id)}
+                        className="h-4 w-4 accent-emerald-400"
+                      />
+                      <span className="truncate">{client.name}</span>
+                    </label>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500">No hay clientes con cuota activa.</p>
+              )}
+            </fieldset>
+
             <button type="submit" disabled={loading} className="mt-3 rounded-lg bg-emerald-400 p-3 font-bold text-slate-950 shadow-lg transition-colors hover:bg-emerald-300 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-400 md:col-span-2">
-              {loading ? 'Creando…' : 'Crear clase'}
+              {loading ? 'Creando…' : Number(repeatWeeks) > 1 ? `Crear ${repeatWeeks} clases` : 'Crear clase'}
             </button>
           </form>
         </motion.div>

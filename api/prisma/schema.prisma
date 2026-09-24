@@ -53,6 +53,7 @@ model User {
   membershipExpiresAt DateTime?     @map("membership_expires_at") @db.DateTime(3)
   phone               String?       @map("telefono") @db.VarChar(30)
   profilePicture      String?       @map("profile_picture") @db.Text
+  classReminderEnabled Boolean      @default(false) @map("recordatorio_clase_activo")
 
   pushDevices   PushDevice[]
   classesTaught GymClass[]    @relation("TeacherClasses")
@@ -116,6 +117,9 @@ model Reservation {
   status      ReservationStatus @map("estado")
   requestedAt DateTime          @default(now()) @map("fecha_solicitud") @db.Timestamp(3)
   promotedAt  DateTime?         @map("promovida_en") @db.DateTime(3)
+  hideName    Boolean           @default(false) @map("ocultar_nombre")
+  fixedEnrollment Boolean       @default(false) @map("inscripcion_fija")
+  reminderSentAt DateTime?      @map("recordatorio_enviado_en") @db.DateTime(3)
 
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   gymClass GymClass @relation(fields: [classId], references: [id], onDelete: Cascade)
@@ -123,6 +127,7 @@ model Reservation {
   @@unique([userId, classId], map: "uq_reservas_user_clase")
   @@index([classId, status, requestedAt], map: "idx_reservas_clase_estado_fecha")
   @@index([userId], map: "idx_reservas_user_id")
+  @@index([status, reminderSentAt, classId], map: "idx_reservas_recordatorio")
   @@map("Reservas")
 }
 

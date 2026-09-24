@@ -98,20 +98,34 @@ describe("Reservation cron jobs", () => {
     expect(fakePush.sent).toHaveLength(1);
   });
 
-  it("sends reminders to confirmed reservations inside the 45-minute window", async () => {
+  it("sends one-hour reminders only to opted-in booked users and never duplicates them", async () => {
     const now = new Date("2026-05-30T10:00:00.000Z");
     const teacher = await createUser({ email: "teacher@test.local", role: "TEACHER" });
-    const client = await createUser({ email: "client@test.local" });
-    const { gymClass } = await createGymClass({ teacherId: teacher.id, capacity: 10, startsAt: addMinutes(now, 45) });
+    const optedIn = await createUser({ email: "client@test.local" });
+    const optedOut = await createUser({ email: "silent@test.local" });
+    await prisma.user.update({
+      where: { id: optedIn.id },
+      data: { classReminderEnabled: true }
+    });
+    const { gymClass } = await createGymClass({ teacherId: teacher.id, capacity: 10, startsAt: addMinutes(now, 60) });
 
-    await prisma.reservation.create({
-      data: { userId: client.id, classId: gymClass.id, status: "CONFIRMADA", requestedAt: addMinutes(now, -10) }
+    await prisma.reservation.createMany({
+      data: [
+        { userId: optedIn.id, classId: gymClass.id, status: "ASISTENCIA_VALIDADA", requestedAt: addMinutes(now, -10) },
+        { userId: optedOut.id, classId: gymClass.id, status: "CONFIRMADA", requestedAt: addMinutes(now, -10) }
+      ]
     });
 
     const result = await service.sendReservationReminders(now);
+    const repeated = await service.sendReservationReminders(now);
 
-    expect(result.sent).toBe(1);
+    expect(result).toEqual({ sent: 1, failed: 0 });
+    expect(repeated).toEqual({ sent: 0, failed: 0 });
     expect(fakePush.sent).toHaveLength(1);
+    expect(fakePush.sent[0]?.userId).toBe(optedIn.id);
     expect(fakePush.sent[0]?.payload.data?.type).toBe("CLASS_REMINDER");
+    await expect(prisma.reservation.findUniqueOrThrow({
+      where: { userId_classId: { userId: optedIn.id, classId: gymClass.id } }
+    })).resolves.toMatchObject({ reminderSentAt: expect.any(Date) });
   });
 });

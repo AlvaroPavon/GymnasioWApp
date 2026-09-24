@@ -19,6 +19,14 @@ import { settingsRouter } from "./routes/settings.routes.js";
 import { imageBankRouter } from "./routes/imageBank.routes.js";
 import { membershipRouter } from "./routes/membership.routes.js";
 
+const publicRasterContentTypes = new Map([
+  [".gif", "image/gif"],
+  [".jpeg", "image/jpeg"],
+  [".jpg", "image/jpeg"],
+  [".png", "image/png"],
+  [".webp", "image/webp"]
+]);
+
 export function createApp() {
   const app = express();
   const allowedOrigins = env.CORS_ORIGIN.split(",").map((origin) => origin.trim());
@@ -32,7 +40,24 @@ export function createApp() {
   app.use(rateLimit({ windowMs: 15 * 60 * 1000, limit: 300, standardHeaders: true, legacyHeaders: false }));
   app.use(realtimeBroadcast);
   app.use(express.json({ limit: "1mb" }));
-  app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
+  app.use(
+    "/uploads",
+    (req, _res, next) => {
+      if (!publicRasterContentTypes.has(path.extname(req.path).toLowerCase())) {
+        next(new AppError(404, "NOT_FOUND", "Route not found"));
+        return;
+      }
+      next();
+    },
+    express.static(path.resolve(process.cwd(), "uploads"), {
+      dotfiles: "ignore",
+      setHeaders: (res, filePath) => {
+        const contentType = publicRasterContentTypes.get(path.extname(filePath).toLowerCase());
+        if (contentType) res.setHeader("Content-Type", contentType);
+        res.setHeader("X-Content-Type-Options", "nosniff");
+      }
+    })
+  );
   app.use(morgan(env.NODE_ENV === "production" ? "combined" : "dev"));
 
   app.get("/health", (_req, res) => res.json({ ok: true }));

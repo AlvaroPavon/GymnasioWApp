@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "../db/prisma.js";
 import { authenticate, requireRoles } from "../middleware/auth.js";
 import { asyncHandler } from "../middleware/asyncHandler.js";
-import { publicUploadUrl, uploadSettings } from "../middleware/upload.js";
+import { uploadSettings, withPersistedHeroImage } from "../middleware/upload.js";
 
 const router = Router();
 
@@ -45,16 +45,18 @@ router.get("/", asyncHandler(async (_req, res) => {
 
 router.put("/", authenticate, requireRoles("ADMIN"), uploadSettings.single("hero"), asyncHandler(async (req, res) => {
   const body = settingsBody.parse(req.body);
-  const heroImage = publicUploadUrl(req.file) ?? body.heroImage ?? body.hero_image;
   const appName = body.appName ?? body.app_name;
-  const settings = await prisma.systemSettings.upsert({
-    where: { id: 1 },
-    update: { appName, heroImage },
-    create: {
-      id: 1,
-      appName: appName ?? "Ronquillo Te Cuida",
-      heroImage: heroImage ?? "https://images.unsplash.com/photo-1540497077202-7c8a3999166f?auto=format&fit=crop&w=1400&q=80"
-    }
+  const settings = await withPersistedHeroImage(req.file, async (uploadedHeroImage) => {
+    const heroImage = uploadedHeroImage ?? body.heroImage ?? body.hero_image;
+    return prisma.systemSettings.upsert({
+      where: { id: 1 },
+      update: { appName, heroImage },
+      create: {
+        id: 1,
+        appName: appName ?? "Ronquillo Te Cuida",
+        heroImage: heroImage ?? "https://images.unsplash.com/photo-1540497077202-7c8a3999166f?auto=format&fit=crop&w=1400&q=80"
+      }
+    });
   });
   res.json(settingsDto(settings));
 }));

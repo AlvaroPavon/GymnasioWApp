@@ -77,7 +77,7 @@ class RealtimeHub {
 
   attach(httpServer: HttpServer) {
     if (this.server) return;
-    this.server = new WebSocketServer({ noServer: true });
+    this.server = new WebSocketServer({ noServer: true, maxPayload: MAX_AUTH_MESSAGE_BYTES });
 
     httpServer.on("upgrade", (request, socket, head) => {
       if (!isRealtimePath(request)) return;

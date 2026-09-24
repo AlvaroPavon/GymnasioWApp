@@ -3,9 +3,10 @@ import request from "supertest";
 import WebSocket from "ws";
 import { createApp } from "../src/app.js";
 import { prisma } from "../src/db/prisma.js";
+import { expoPushService } from "../src/services/push.service.js";
 import { realtimeHub } from "../src/services/realtime.service.js";
 import { signAccessToken } from "../src/services/token.service.js";
-import { createUser, resetDatabase } from "./helpers/database.js";
+import { createGymClass, createUser, resetDatabase } from "./helpers/database.js";
 
 function listen(server: Server) {
   return new Promise<number>((resolve) => {
@@ -73,6 +74,7 @@ describe("Realtime sync", () => {
   });
 
   afterEach(async () => {
+    jest.restoreAllMocks();
     realtimeHub.close();
     await new Promise<void>((resolve) => server.close(() => resolve()));
   });
@@ -100,6 +102,48 @@ describe("Realtime sync", () => {
       scope: "classTypes",
       actorUserId: admin.id
     });
+
+    socket.close();
+  });
+
+  it("returns success and broadcasts after a committed promotion when push delivery fails", async () => {
+    const admin = await createUser({ email: "push-failure-admin@test.local", role: "ADMIN" });
+    const teacher = await createUser({ email: "push-failure-teacher@test.local", role: "TEACHER" });
+    const occupant = await createUser({ email: "push-failure-occupant@test.local" });
+    const waitlisted = await createUser({ email: "push-failure-waitlisted@test.local" });
+    const { gymClass } = await createGymClass({ teacherId: teacher.id, capacity: 1 });
+    await prisma.reservation.createMany({
+      data: [
+        { userId: occupant.id, classId: gymClass.id, status: "CONFIRMADA" },
+        { userId: waitlisted.id, classId: gymClass.id, status: "EN_ESPERA" }
+      ]
+    });
+    jest.spyOn(expoPushService, "sendToUser")
+      .mockRejectedValue(new Error("provider failed for ExponentPushToken[secret-push-token]"));
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const token = signAccessToken({ userId: admin.id, role: admin.role });
+    const port = (server.address() as { port: number }).port;
+    const socket = await connectAuthenticated(port, token);
+    const eventPromise = waitForDataChanged(socket);
+
+    const response = await request(server)
+      .delete(`/api/classes/${gymClass.id}/reservations/${occupant.id}`)
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(response.status).toBe(200);
+    await expect(eventPromise).resolves.toMatchObject({
+      type: "DATA_CHANGED",
+      scope: "classes",
+      actorUserId: admin.id
+    });
+    await expect(prisma.reservation.findUniqueOrThrow({
+      where: { userId_classId: { userId: occupant.id, classId: gymClass.id } }
+    })).resolves.toMatchObject({ status: "CANCELADA" });
+    await expect(prisma.reservation.findUniqueOrThrow({
+      where: { userId_classId: { userId: waitlisted.id, classId: gymClass.id } }
+    })).resolves.toMatchObject({ status: "CONFIRMADA" });
+    expect(errorSpy).toHaveBeenCalled();
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain("secret-push-token");
 
     socket.close();
   });

@@ -10,6 +10,7 @@ export default function ClassDetailsModal({ isOpen, onClose, cls, onUserClick, o
   const dialogRef = useRef(null);
   const closeButtonRef = useRef(null);
   const [imageFailed, setImageFailed] = useState(false);
+  const [privacyPending, setPrivacyPending] = useState(false);
   const imageUrl = effectiveClassImageUrl(cls);
 
   useEffect(() => {
@@ -52,6 +53,15 @@ export default function ClassDetailsModal({ isOpen, onClose, cls, onUserClick, o
   const confirmedReservations = (cls.reservations || []).filter((reservation) => ['CONFIRMADA', 'ASISTENCIA_VALIDADA'].includes(reservation.status));
   const waitlistReservations = (cls.reservations || []).filter((reservation) => reservation.status === 'EN_ESPERA');
   const noShowReservations = (cls.reservations || []).filter((reservation) => reservation.status === 'NO_ASISTE');
+  const ownReservation = (cls.reservations || []).find((reservation) => (
+    reservation.userId === user?.id
+    || reservation.user_id === user?.id
+    || reservation.user?.id === user?.id
+  ));
+  const ownReservationHidden = ownReservation?.hideName
+    ?? ownReservation?.hide_name
+    ?? ownReservation?.ocultar_nombre
+    ?? false;
 
   const removeReservation = async (event, targetUserId) => {
     event.stopPropagation();
@@ -65,38 +75,68 @@ export default function ClassDetailsModal({ isOpen, onClose, cls, onUserClick, o
     }
   };
 
-  const renderReservationUser = (reservation) => (
-    <div key={`${reservation.status}-${reservation.user.id}`} className="relative rounded-lg border border-transparent bg-slate-800 p-2 hover:border-slate-500">
+  const updateReservationPrivacy = async (hideName) => {
+    if (!ownReservation) return;
+    try {
+      setPrivacyPending(true);
+      await axios.patch(`${API_URL}/classes/${cls.id}/reservations/privacy`, { hideName });
+      await onChanged?.();
+    } catch (error) {
+      alert(getApiErrorMessage(error, 'No se pudo actualizar la privacidad de la reserva.'));
+    } finally {
+      setPrivacyPending(false);
+    }
+  };
+
+  const renderReservationUser = (reservation) => {
+    const attendee = reservation.user || { id: null, name: 'Usuario', profile_picture: null };
+    const anonymous = attendee.id === null;
+    const content = (
+      <>
+        <span className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-slate-900">
+          {attendee.profile_picture ? (
+            <img src={attendee.profile_picture} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <span className="text-lg font-bold text-slate-400" aria-hidden="true">{attendee.name.charAt(0)}</span>
+          )}
+        </span>
+        <span className="w-full truncate text-center text-xs font-semibold text-white" title={attendee.name}>
+          {anonymous ? attendee.name : attendee.name.split(' ')[0]}
+        </span>
+        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${reservationStatusClass(reservation.status)}`}>
+          {reservationStatusLabel(reservation.status)}
+        </span>
+        {canManageReservations && (reservation.fixedEnrollment || reservation.fixed_enrollment || reservation.inscripcion_fija) && (
+          <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-300">Fijo</span>
+        )}
+      </>
+    );
+
+    return (
+    <div key={`${reservation.status}-${reservation.id}`} className="relative rounded-lg border border-transparent bg-slate-800 p-2 hover:border-slate-500">
       {canManageReservations && reservation.status !== 'NO_ASISTE' && (
         <button
           type="button"
-          onClick={(event) => removeReservation(event, reservation.user.id)}
+          onClick={(event) => removeReservation(event, attendee.id)}
           className="absolute -right-2 -top-3 z-10 rounded-full bg-red-500 px-2 py-1 text-[10px] font-black text-white shadow-lg hover:bg-red-400 focus-visible:outline-2 focus-visible:outline-blue-400"
         >
           Quitar
         </button>
       )}
-      <button
-        type="button"
-        onClick={() => onUserClick(reservation.user)}
-        className="flex w-full flex-col items-center gap-2 rounded-md p-1 transition-colors hover:bg-slate-700 focus-visible:outline-2 focus-visible:outline-blue-400"
-      >
-        <span className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-slate-900">
-          {reservation.user.profile_picture ? (
-            <img src={reservation.user.profile_picture} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <span className="text-lg font-bold text-slate-400" aria-hidden="true">{reservation.user.name.charAt(0)}</span>
-          )}
-        </span>
-        <span className="w-full truncate text-center text-xs font-semibold text-white" title={reservation.user.name}>
-          {reservation.user.name.split(' ')[0]}
-        </span>
-        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${reservationStatusClass(reservation.status)}`}>
-          {reservationStatusLabel(reservation.status)}
-        </span>
-      </button>
+      {canManageReservations ? (
+        <button
+          type="button"
+          onClick={() => onUserClick(attendee)}
+          className="flex w-full flex-col items-center gap-2 rounded-md p-1 transition-colors hover:bg-slate-700 focus-visible:outline-2 focus-visible:outline-blue-400"
+        >
+          {content}
+        </button>
+      ) : (
+        <div className="flex w-full flex-col items-center gap-2 rounded-md p-1">{content}</div>
+      )}
     </div>
-  );
+    );
+  };
 
   return (
     <AnimatePresence>
@@ -193,12 +233,31 @@ export default function ClassDetailsModal({ isOpen, onClose, cls, onUserClick, o
               </div>
             </div>
 
+            {user?.role === 'CLIENT' && ownReservation && (
+              <label className="mb-6 flex cursor-pointer items-start gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4">
+                <input
+                  type="checkbox"
+                  checked={ownReservationHidden}
+                  disabled={privacyPending}
+                  onChange={(event) => updateReservationPrivacy(event.target.checked)}
+                  className="mt-1 h-5 w-5 accent-emerald-400"
+                />
+                <span>
+                  <span className="block font-bold text-white">Ocultar mi nombre</span>
+                  <span className="block text-xs text-slate-400">Solo el administrador y el profesor podrán identificarte.</span>
+                </span>
+              </label>
+            )}
+
             {canManageReservations && (
               <>
                 <ReservationSection title="Asistentes confirmados" reservations={confirmedReservations} renderUser={renderReservationUser} />
                 {waitlistReservations.length > 0 && <ReservationSection title="Lista de espera" reservations={waitlistReservations} renderUser={renderReservationUser} tone="amber" />}
                 {noShowReservations.length > 0 && <ReservationSection title="No asistieron" reservations={noShowReservations} renderUser={renderReservationUser} tone="red" />}
               </>
+            )}
+            {user?.role === 'CLIENT' && (
+              <ReservationSection title="Asistentes" reservations={confirmedReservations} renderUser={renderReservationUser} />
             )}
           </div>
         </motion.div>

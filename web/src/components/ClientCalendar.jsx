@@ -22,6 +22,9 @@ export default function ClientCalendar({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [actionPendingId, setActionPendingId] = useState(null);
+  const [hideNameOnReserve, setHideNameOnReserve] = useState(
+    () => localStorage.getItem('hideNameOnReserve') === 'true'
+  );
 
   const fetchCalendar = async () => {
     setLoading(true);
@@ -47,7 +50,10 @@ export default function ClientCalendar({
   const runReservationAction = async (gymClass, endpoint) => {
     setActionPendingId(gymClass.id);
     try {
-      const result = await axios.post(`${API_URL}/classes/${gymClass.id}/${endpoint}`);
+      const result = await axios.post(
+        `${API_URL}/classes/${gymClass.id}/${endpoint}`,
+        endpoint === 'reserve' ? { hideName: hideNameOnReserve } : undefined
+      );
       if (endpoint === 'reserve' && result.data?.status === 'EN_ESPERA') {
         alert('Clase completa: quedaste en lista de espera.');
       }
@@ -83,6 +89,10 @@ export default function ClientCalendar({
 
   const membershipActive = isClientMembershipActive(user);
   const selectedClass = selectedClassById(classes, selectedClassId);
+  const updateHideNameDefault = (checked) => {
+    setHideNameOnReserve(checked);
+    localStorage.setItem('hideNameOnReserve', String(checked));
+  };
 
   return (
     <div className="space-y-6">
@@ -97,6 +107,19 @@ export default function ClientCalendar({
           </button>
         </div>
       )}
+
+      <label className="glass flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 p-4">
+        <input
+          type="checkbox"
+          checked={hideNameOnReserve}
+          onChange={(event) => updateHideNameDefault(event.target.checked)}
+          className="mt-1 h-5 w-5 accent-emerald-400"
+        />
+        <span>
+          <span className="block font-bold text-white">Ocultar mi nombre al reservar</span>
+          <span className="block text-sm text-slate-400">Los demás clientes verán “Usuario anónimo”. El administrador y el profesor seguirán viendo tu identidad.</span>
+        </span>
+      </label>
 
       <ActivitiesCalendar
         role="CLIENT"
