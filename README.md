@@ -50,6 +50,7 @@ Todos usan `Password123!`.
 - Fecha de vencimiento de cuota para clientes; `ADMIN` y `TEACHER` quedan exentos.
 - Avisos al admin cuando un cliente notifica un pago y renovación manual/confirmada por 1 mes.
 - CRUD de clases con tipo de clase, profesor, aforo e imagen automática por banco de imágenes.
+- Creación de series semanales de hasta 52 clases y asignación inicial de clientes fijos por admin/profesor.
 - Reserva solo para clientes con mensualidad pagada.
 - Reserva bloqueada si la cuota del cliente está vencida.
 - Clases llenas pasan a `EN_ESPERA`, no se bloquea el botón por aforo.
@@ -57,6 +58,8 @@ Todos usan `Password123!`.
 - Validación de asistencia hasta 30 minutos antes.
 - Admin/profesor propietario pueden quitar usuarios de una clase.
 - La app móvil incluye detalle de clase adaptado con reservas, lista de espera, asistencia y gestión de alumnos.
+- Privacidad por reserva: el cliente puede ocultar su nombre al resto de clientes sin ocultarlo a admin/profesor.
+- Recordatorio push opt-in una hora antes, con marca persistente para evitar duplicados.
 - Cron de no-show, penalización, promoción y recordatorios push.
 - Registro de `push_token` desde la app Expo al iniciar sesión.
 
@@ -92,6 +95,9 @@ Ver documentación completa en [`api/docs/API.md`](./api/docs/API.md).
 - `GET /api/class-types`
 - `PUT /api/class-types/:id` (`ADMIN`, JSON o multipart `image`)
 - `GET /api/classes`
+- `POST /api/classes` (admite `repeatWeeks` y `fixedUserIds`)
+- `GET /api/users/eligible-clients`
+- `PATCH /api/users/me/preferences`
 - `POST /api/membership/payments`
 - `GET /api/membership/payments/pending`
 - `POST /api/membership/payments/:id/confirm`
@@ -99,6 +105,7 @@ Ver documentación completa en [`api/docs/API.md`](./api/docs/API.md).
 - `GET /api/admin-notifications`
 - `PUT /api/users/:id/password`
 - `POST /api/classes/:classId/reservations`
+- `PATCH /api/classes/:classId/reservations/privacy`
 - `DELETE /api/classes/:classId/reservations/:userId`
 - `POST /api/classes/:classId/attendance/validate`
 
@@ -113,7 +120,7 @@ Ver documentación completa en [`api/docs/API.md`](./api/docs/API.md).
 
 ## Nota de producción importante
 
-El esquema pedido no incluye log persistente para recordatorios push. El cron de recordatorio usa ventana temporal de 45-46 minutos; para idempotencia fuerte ante reinicios conviene agregar una tabla `NotificacionesEnviadas` o un campo `recordatorio_enviado_at`.
+Los recordatorios usan `Reservas.recordatorio_enviado_en` como claim persistente. Si el envío push falla, el claim se libera para permitir un reintento; si se envía correctamente, no vuelve a notificarse esa reserva.
 
 Además, `/var/www/gimnasiowapp/current/api/uploads` debe resolver siempre a `/var/www/gimnasiowapp/shared/uploads`. El orden de copia de imágenes por defecto, backup verificado, migración sin seed/reset y comprobaciones pre/post está en [`docs/PRODUCTION_OPERATIONS.md`](./docs/PRODUCTION_OPERATIONS.md).
 

@@ -89,6 +89,18 @@ Requiere `ADMIN`. Restablece la contraseña de un usuario cuando la olvida.
 { "id": 3, "name": "Client Test", "email": "client@example.com", "role": "CLIENT" }
 ```
 
+### GET `/api/users/eligible-clients`
+
+Requiere `ADMIN` o `TEACHER`. Devuelve clientes con cuota pagada y no vencida que pueden asignarse como fijos al crear una serie de clases.
+
+### PATCH `/api/users/me/preferences`
+
+Actualiza la preferencia de recordatorio del usuario autenticado.
+
+```json
+{ "classReminderEnabled": true }
+```
+
 ## Membresías y pagos
 
 ### POST `/api/membership/payments`
@@ -180,7 +192,7 @@ Devuelve clases visibles para el usuario autenticado. Para profesores, solo sus 
 
 - `_count.reservations` cuenta solo ocupación real: `CONFIRMADA` + `ASISTENCIA_VALIDADA`.
 - `reservations[]` incluye `CONFIRMADA`, `ASISTENCIA_VALIDADA`, `EN_ESPERA` y `NO_ASISTE` para pintar estados en UI.
-- Para `CLIENT`, `reservations[]` contiene únicamente sus propias reservas; el conteo agregado no revela identidades.
+- Para `CLIENT`, `reservations[]` contiene su propia reserva y asistentes con plaza (`CONFIRMADA`/`ASISTENCIA_VALIDADA`). Los demás asistentes se serializan como perfiles públicos sin email, teléfono, cuota ni pagos; si eligieron ocultarse, se devuelve un asistente anónimo y `userId: null`.
 - Para `CLIENT`, `teacher` es un resumen público con `id`, `name`, `role`, `profilePicture` y `profile_picture`. No expone email, teléfono, contraseña, membresía ni pagos. `ADMIN` y `TEACHER` reciben el DTO completo que necesitan para gestionar clases.
 - `image_url`/`imageUrl` es siempre la imagen efectiva: override de la clase, imagen del tipo asignado, mejor coincidencia por título con otro tipo que tenga imagen y, por último, `ImageBank`.
 - La coincidencia por título normaliza mayúsculas, acentos y separadores, exige palabras/frases completas y prefiere coincidencias exactas o más largas. `Functional` y `Entrenamiento funcional` son alias; `General` nunca se usa como coincidencia amplia.
@@ -198,9 +210,13 @@ Requiere `ADMIN` o `TEACHER`. Si crea un profesor, `teacherId` se fuerza al usua
   "teacherId": 2,
   "maxCapacity": 20,
   "startsAt": "2026-06-01T09:00:00.000Z",
-  "endsAt": "2026-06-01T10:00:00.000Z"
+  "endsAt": "2026-06-01T10:00:00.000Z",
+  "repeatWeeks": 4,
+  "fixedUserIds": [3, 7]
 }
 ```
+
+`repeatWeeks` acepta de 1 a 52 y crea las clases separadas por siete días dentro de una sola transacción. `fixedUserIds` se deduplica, no puede superar el aforo y solo acepta clientes pagados/no vencidos; cada uno queda `CONFIRMADA` con `fixedEnrollment: true` en toda la serie. Un profesor solo puede asignarse a sí mismo.
 
 También acepta alias de la UI: `tipo_clase_id`, `teacher_id`, `max_capacity`, `start_time`, `end_time`, `image_url`.
 
@@ -225,6 +241,12 @@ Requiere `ADMIN`.
 ### POST `/api/classes/:classId/reservations`
 
 Requiere cliente con `estado_mensualidad = PAGADO` y `membership_expires_at` futuro.
+
+Puede incluir la opción de privacidad:
+
+```json
+{ "hideName": true }
+```
 
 **201 confirmado**
 
@@ -261,6 +283,14 @@ Alias de compatibilidad para la UI web/mobile. Mismo comportamiento que `POST /a
 ### POST `/api/classes/:id/cancel`
 
 Cliente cancela su propia reserva. Si libera cupo, promociona lista de espera.
+
+### PATCH `/api/classes/:classId/reservations/privacy`
+
+Requiere `CLIENT` y una reserva activa propia. Cambia únicamente si su nombre será visible para otros clientes; admin y profesor siguen viendo la identidad real.
+
+```json
+{ "hideName": true }
+```
 
 ### DELETE `/api/classes/:classId/reservations/:userId`
 
@@ -299,8 +329,14 @@ Requiere `ADMIN`. Acepta `multipart/form-data` con `hero`.
 
 Requiere `ADMIN`. Mapea `keyword` a `image_url` para asignar imágenes automáticamente a clases.
 
-## Seguridad y vulnerabilidades pendientes
+## Recordatorios de clase
 
-- El recordatorio de 45 minutos no tiene idempotencia persistente porque el esquema pedido no incluye campo/log de recordatorios. En producción real conviene agregar `NotificacionesEnviadas` o `recordatorio_enviado_at` para evitar duplicados tras reinicios.
+- El usuario activa/desactiva el recordatorio mediante `PATCH /api/users/me/preferences`.
+- El cron busca reservas `CONFIRMADA` o `ASISTENCIA_VALIDADA` cuya clase empieza entre 60 y 61 minutos después.
+- `recordatorio_enviado_en` se reclama atómicamente antes del push para impedir duplicados entre procesos o reinicios.
+- Si Expo Push falla, el claim se libera para permitir el reintento.
+
+## Seguridad
+
 - No expongas `JWT_SECRET`, `.env` ni dumps de DB.
 - Las queries raw usan tagged templates de Prisma; no concatenar inputs del usuario en SQL.

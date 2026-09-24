@@ -4,9 +4,9 @@ Esta guía describe el flujo local de preparación. No reemplaza la revisión fi
 
 ## Base móvil verificada
 
-- Expo SDK `57.0.16`.
-- React Native `0.86.2` con React `19.2.3`.
-- Node.js `>=20.19`.
+- Expo SDK `57.0.24`.
+- React Native `0.86.3` con React `19.2.3`.
+- Node.js `>=22.12 <25`; producción usa Node.js 24.21 LTS.
 - Configuración dinámica: `mobile/app.config.js`.
 - Perfiles remotos: `mobile/eas.json`.
 - Validación local: `mobile/scripts/validate-release-env.mjs`.

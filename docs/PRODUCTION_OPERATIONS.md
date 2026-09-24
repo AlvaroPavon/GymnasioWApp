@@ -126,6 +126,7 @@ Repetir los conteos de todas las tablas y la consulta de admins. Se acepta únic
 - Todas las tablas conservan su conteo salvo cambios explicados por migraciones pendientes.
 - `_prisma_migrations` aumenta exactamente por la cantidad de migraciones aplicadas.
 - Para `0004_class_type_images`, `Clases` y `Penalizaciones` no cambian de conteo. `TiposClase` solo puede variar por la normalización `Functional`/`Entrenamiento funcional` y por insertar defaults ausentes (`Entrenamiento funcional`, `Yoga`, `Pilates`).
+- Para `0006_class_enrollment_preferences`, `Usuarios` y `Reservas` no cambian de conteo: solo se añaden columnas con defaults seguros y un índice de recordatorios.
 - No existen relaciones huérfanas:
 
   ```sql
