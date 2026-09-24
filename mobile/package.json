@@ -15,10 +15,10 @@
     "check:privacy-link": "node scripts/check-privacy-policy-link.mjs",
     "release:check": "node scripts/validate-release-env.mjs && npm run check:privacy-link",
     "release:check:android": "node scripts/validate-release-env.mjs android && npm run check:privacy-link",
-    "build:android": "npm run release:check:android && npx eas-cli@22.3.0 build --platform android --profile production",
-    "build:ios": "npm run release:check && npx eas-cli@22.3.0 build --platform ios --profile production-ios",
-    "submit:android": "npx eas-cli@22.3.0 submit --platform android --profile production",
-    "submit:ios": "npx eas-cli@22.3.0 submit --platform ios --profile production"
+    "build:android": "npm run release:check:android && npx eas-cli@24.7.0 build --platform android --profile production",
+    "build:ios": "npm run release:check && npx eas-cli@24.7.0 build --platform ios --profile production-ios",
+    "submit:android": "npx eas-cli@24.7.0 submit --platform android --profile production",
+    "submit:ios": "npx eas-cli@24.7.0 submit --platform ios --profile production"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",

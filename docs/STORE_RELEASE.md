@@ -84,9 +84,9 @@ Configuración vigente:
 Preparación de credenciales:
 
 ```powershell
-npx eas-cli@22.3.0 login
-npx eas-cli@22.3.0 whoami
-npx eas-cli@22.3.0 credentials
+npx eas-cli@24.7.0 login
+npx eas-cli@24.7.0 whoami
+npx eas-cli@24.7.0 credentials
 ```
 
 Cuando corresponda generar el AAB, ejecutá el build mediante el cargador para que el `release:check:android` heredado reciba el entorno:
@@ -107,7 +107,7 @@ node src/release/runWithEnv.mjs submit:android
 
 1. Registrar el Bundle ID en Apple Developer.
 2. Crear la app en App Store Connect con el mismo `IOS_BUNDLE_IDENTIFIER`.
-3. Configurar credenciales con `npx eas-cli@22.3.0 credentials`.
+3. Configurar credenciales con `npx eas-cli@24.7.0 credentials`.
 4. Generar el build mediante el cargador:
 
 ```powershell
