@@ -21,7 +21,7 @@ La API resuelve uploads desde `process.cwd()/uploads`. Por eso, cuando el proces
 
    ```bash
    install -d -m 0755 /var/www/gimnasiowapp/shared/uploads/class-types
-   cp -n <new-release>/api/uploads/class-types/* \
+   cp --update=none <new-release>/api/uploads/class-types/* \
      /var/www/gimnasiowapp/shared/uploads/class-types/
    ```
 
@@ -42,7 +42,23 @@ La API resuelve uploads desde `process.cwd()/uploads`. Por eso, cuando el proces
      "/var/www/gimnasiowapp/shared/uploads"
    ```
 
-`cp -n` es deliberado: un deploy incorpora defaults que falten, pero nunca sobrescribe una imagen persistente existente.
+`cp --update=none` es deliberado: un deploy incorpora defaults que falten, pero nunca sobrescribe una imagen persistente existente.
+
+## Instalación y build del release
+
+El servidor de producción no compila la app móvil: Expo/EAS se encarga de Android e iOS. Instalar el workspace `mobile` en el servidor consume memoria sin aportar archivos al despliegue y puede activar el OOM killer. Con Node 24 en el `PATH`, instalar únicamente raíz, API y web:
+
+```bash
+export PATH=/opt/node-v24/bin:$PATH
+cd <new-release>
+npm ci --workspace api --workspace web --include-workspace-root \
+  --include=dev --no-audit --no-fund
+test -f node_modules/@tailwindcss/oxide-linux-x64-gnu/tailwindcss-oxide.linux-x64-gnu.node
+npm -w api run build
+npm -w web run build
+```
+
+El binding Linux de Tailwind se declara de forma explícita en el lockfile para que `npm ci` sea reproducible aunque el lock se genere en Windows. No cambiar `current` si falta el binding o falla cualquiera de los dos builds.
 
 ## Migración de producción sin pérdida de datos
 
