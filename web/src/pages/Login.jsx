@@ -62,7 +62,7 @@ export default function Login() {
         style={{ '--brand-panel-image': `url("${settings.hero_image}")` }}
         aria-label="Presentación de Ronquillo Te Cuida"
       >
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_72%_16%,rgba(244,166,33,.24),transparent_32%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_72%_16%,rgba(255,90,71,.24),transparent_32%)]" />
         <motion.div
           initial={reduceMotion ? false : { opacity: 0, y: -16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -73,7 +73,7 @@ export default function Login() {
             <img src={ronquilloLogo} alt="" className="h-12 w-20 rounded-xl object-contain" />
           </div>
           <div>
-            <p className="text-sm font-black uppercase tracking-[.18em] text-[#ffc65c]">Centro deportivo</p>
+            <p className="text-sm font-black uppercase tracking-[.18em] text-[#ff8a7d]">Centro deportivo</p>
             <p className="text-sm font-semibold text-zinc-300">Fuerza · equilibrio · bienestar</p>
           </div>
         </motion.div>
@@ -84,10 +84,10 @@ export default function Login() {
           transition={{ delay: 0.18, duration: 0.75, ease: [0.2, 0.8, 0.2, 1] }}
           className="relative z-10 max-w-2xl"
         >
-          <div className="mb-6 h-1 w-20 rounded-full bg-[#f4a621]" />
+          <div className="mb-6 h-1 w-20 rounded-full bg-[#ff5a47]" />
           <h2 className="max-w-xl text-6xl font-black leading-[.94] tracking-[-.055em] text-white xl:text-7xl">
             Tu centro,
-            <span className="mt-2 block text-[#ffc65c]">siempre contigo.</span>
+            <span className="mt-2 block text-[#ff8a7d]">siempre contigo.</span>
           </h2>
           <p className="mt-6 max-w-lg text-lg font-medium leading-8 text-zinc-300">
             Reserva actividades, valida tu asistencia y sigue tu agenda desde una experiencia rápida y sencilla.
@@ -100,7 +100,7 @@ export default function Login() {
       </section>
 
       <section className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden px-5 py-8 sm:px-8 lg:px-12">
-        <div className="absolute -right-32 -top-36 h-96 w-96 rounded-full bg-[#f4a621]/15 blur-[110px]" />
+        <div className="absolute -right-32 -top-36 h-96 w-96 rounded-full bg-[#ff5a47]/15 blur-[110px]" />
         <div className="absolute -bottom-44 -left-40 h-[28rem] w-[28rem] rounded-full bg-[#0a4c7a]/20 blur-[130px]" />
 
         <motion.div
@@ -118,7 +118,7 @@ export default function Login() {
           </motion.div>
 
           <div className="mb-7">
-            <p className="mb-2 text-xs font-black uppercase tracking-[.2em] text-[#f4a621]">Acceso seguro</p>
+            <p className="mb-2 text-xs font-black uppercase tracking-[.2em] text-[#ff5a47]">Acceso seguro</p>
             <h1 className="text-4xl font-black tracking-[-.045em] text-white">Bienvenido de nuevo</h1>
             <p className="mt-2 text-sm font-medium leading-6 text-zinc-400">
               Inicia sesión para gestionar tus clases y reservas.
@@ -143,7 +143,7 @@ export default function Login() {
             <label className="block">
               <span className="mb-2 block text-xs font-black uppercase tracking-[.14em] text-zinc-400">Email</span>
               <span className="dark-input flex min-h-14 items-center gap-3 rounded-2xl px-4">
-                <EnvelopeSimple size={21} weight="bold" className="shrink-0 text-[#f4a621]" aria-hidden="true" />
+                <EnvelopeSimple size={21} weight="bold" className="shrink-0 text-[#ff5a47]" aria-hidden="true" />
                 <input
                   type="email"
                   value={email}
@@ -159,7 +159,7 @@ export default function Login() {
             <label className="block">
               <span className="mb-2 block text-xs font-black uppercase tracking-[.14em] text-zinc-400">Contraseña</span>
               <span className="dark-input flex min-h-14 items-center gap-3 rounded-2xl px-4">
-                <LockKey size={21} weight="bold" className="shrink-0 text-[#f4a621]" aria-hidden="true" />
+                <LockKey size={21} weight="bold" className="shrink-0 text-[#ff5a47]" aria-hidden="true" />
                 <input
                   type={passwordVisible ? 'text' : 'password'}
                   value={password}
@@ -197,7 +197,7 @@ export default function Login() {
               href={PRIVACY_POLICY_URL}
               target="_blank"
               rel="noreferrer"
-              className="mt-1 inline-block text-zinc-400 underline decoration-zinc-600 underline-offset-4 transition-colors hover:text-[#ffc65c]"
+              className="mt-1 inline-block text-zinc-400 underline decoration-zinc-600 underline-offset-4 transition-colors hover:text-[#ff8a7d]"
             >
               Política de privacidad
             </a>

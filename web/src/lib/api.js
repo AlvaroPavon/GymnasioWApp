@@ -11,10 +11,13 @@ export const API_BASE_URL = trimTrailingSlash(configuredApiBaseUrl || getDefault
 export const API_URL = `${API_BASE_URL}/api`;
 
 export function getApiErrorMessage(error, fallback = 'Operación fallida') {
-  return error?.response?.data?.error?.message
-    || error?.response?.data?.message
-    || error?.message
-    || fallback;
+  const apiMessage = error?.response?.data?.error?.message || error?.response?.data?.message;
+  if (apiMessage) return apiMessage;
+  if (error?.code === 'ECONNABORTED') return 'La solicitud tardó demasiado. Inténtalo de nuevo.';
+  if (error?.code === 'ERR_NETWORK' || !error?.response) {
+    return 'No se pudo conectar con el servidor. Revisa tu conexión.';
+  }
+  return fallback;
 }
 
 export const OCCUPYING_STATUSES = new Set(['CONFIRMADA', 'ASISTENCIA_VALIDADA']);

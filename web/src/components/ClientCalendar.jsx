@@ -80,7 +80,7 @@ export default function ClientCalendar({
 
   const handleReportPayment = async () => {
     try {
-      await axios.post(`${API_URL}/membership/payments`, { notes: 'Payment reported from web client dashboard' });
+      await axios.post(`${API_URL}/membership/payments`, { notes: 'Pago notificado desde el panel web del cliente.' });
       alert('Pago notificado al administrador. Te activarán la cuenta al confirmarlo.');
     } catch (requestError) {
       alert(getApiErrorMessage(requestError, 'No se pudo notificar el pago.'));
@@ -108,12 +108,12 @@ export default function ClientCalendar({
         </div>
       )}
 
-      <label className="glass flex cursor-pointer items-start gap-3 rounded-[1.5rem] border border-white/10 p-4 transition-colors hover:border-[#f4a621]/25">
+      <label className="glass flex cursor-pointer items-start gap-3 rounded-[1.5rem] border border-white/10 p-4 transition-colors hover:border-[#ff5a47]/25">
         <input
           type="checkbox"
           checked={hideNameOnReserve}
           onChange={(event) => updateHideNameDefault(event.target.checked)}
-          className="mt-1 h-5 w-5 accent-[#f4a621]"
+          className="mt-1 h-5 w-5 accent-[#ff5a47]"
         />
         <span>
           <span className="block font-bold text-white">Ocultar mi nombre al reservar</span>

@@ -107,7 +107,7 @@ export default function ClassDetailsModal({ isOpen, onClose, cls, onUserClick, o
           {reservationStatusLabel(reservation.status)}
         </span>
         {canManageReservations && (reservation.fixedEnrollment || reservation.fixed_enrollment || reservation.inscripcion_fija) && (
-          <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-300">Fijo</span>
+          <span className="rounded-full border border-red-500/20 bg-red-500/10 px-2 py-0.5 text-[10px] font-bold text-red-300">Fijo</span>
         )}
       </>
     );
@@ -118,7 +118,7 @@ export default function ClassDetailsModal({ isOpen, onClose, cls, onUserClick, o
         <button
           type="button"
           onClick={(event) => removeReservation(event, attendee.id)}
-          className="absolute -right-2 -top-3 z-10 rounded-full bg-red-500 px-2 py-1 text-[10px] font-black text-white shadow-lg hover:bg-red-400 focus-visible:outline-2 focus-visible:outline-amber-400"
+          className="absolute -right-2 -top-3 z-10 rounded-full bg-red-500 px-2 py-1 text-[10px] font-black text-white shadow-lg hover:bg-red-400 focus-visible:outline-2 focus-visible:outline-red-400"
         >
           Quitar
         </button>
@@ -127,7 +127,7 @@ export default function ClassDetailsModal({ isOpen, onClose, cls, onUserClick, o
         <button
           type="button"
           onClick={() => onUserClick(attendee)}
-          className="flex w-full flex-col items-center gap-2 rounded-md p-1 transition-colors hover:bg-slate-700 focus-visible:outline-2 focus-visible:outline-amber-400"
+          className="flex w-full flex-col items-center gap-2 rounded-md p-1 transition-colors hover:bg-slate-700 focus-visible:outline-2 focus-visible:outline-red-400"
         >
           {content}
         </button>
@@ -163,7 +163,7 @@ export default function ClassDetailsModal({ isOpen, onClose, cls, onUserClick, o
             ref={closeButtonRef}
             type="button"
             onClick={onClose}
-            className="absolute right-4 top-4 z-50 rounded-full bg-black/80 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-black focus-visible:outline-2 focus-visible:outline-amber-400"
+            className="absolute right-4 top-4 z-50 rounded-full bg-black/80 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-black focus-visible:outline-2 focus-visible:outline-red-400"
           >
             Cerrar
           </button>
@@ -180,33 +180,33 @@ export default function ClassDetailsModal({ isOpen, onClose, cls, onUserClick, o
               <div
                 role="img"
                 aria-label={`Imagen no disponible para ${cls.title}`}
-                className="relative flex h-48 w-2/5 items-center justify-center overflow-hidden border-r border-white/5 bg-gradient-to-br from-slate-800 via-slate-900 to-amber-950/60 p-5 text-center md:h-60 md:w-full md:border-b md:border-r-0"
+                className="relative flex h-48 w-2/5 items-center justify-center overflow-hidden border-r border-white/5 bg-gradient-to-br from-slate-800 via-slate-900 to-red-950/60 p-5 text-center md:h-60 md:w-full md:border-b md:border-r-0"
               >
-                <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-amber-400/10 blur-2xl" aria-hidden="true" />
+                <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-red-400/10 blur-2xl" aria-hidden="true" />
                 <div className="relative rounded-2xl border border-white/10 bg-slate-950/55 px-5 py-4 shadow-xl backdrop-blur-sm">
-                  <span className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl border border-amber-400/20 bg-amber-400/10 text-amber-300" aria-hidden="true">
+                  <span className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl border border-red-400/20 bg-red-400/10 text-red-300" aria-hidden="true">
                     <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8">
                       <path d="M4 10v4m3-7v10m10-10v10m3-7v4M7 12h10" strokeLinecap="round" />
                     </svg>
                   </span>
-                  <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-300">Actividad</p>
+                  <p className="text-xs font-black uppercase tracking-[0.16em] text-red-300">Actividad</p>
                   <p className="mt-1 text-sm font-semibold text-slate-300">Imagen no disponible</p>
                 </div>
               </div>
             )}
             <div className="flex-1 p-5">
-              <span className="mb-3 inline-block rounded-full bg-amber-500 px-3 py-1 text-xs font-bold text-white">
+              <span className="mb-3 inline-block rounded-full bg-red-500 px-3 py-1 text-xs font-bold text-white">
                 {isFull ? 'Aforo completo' : 'Plazas disponibles'}
               </span>
               <h2 id="class-details-title" className="mb-2 text-2xl font-extrabold text-white">{cls.title}</h2>
               <p className="mb-5 line-clamp-3 text-sm text-slate-300">{cls.description || 'Sin descripción adicional.'}</p>
               {cls.teacher && (
-                <button type="button" onClick={() => onUserClick(cls.teacher)} className="flex items-center gap-3 rounded-lg text-left focus-visible:outline-2 focus-visible:outline-amber-400">
-                  <span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-amber-400 bg-slate-800">
+                <button type="button" onClick={() => onUserClick(cls.teacher)} className="flex items-center gap-3 rounded-lg text-left focus-visible:outline-2 focus-visible:outline-red-400">
+                  <span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-red-400 bg-slate-800">
                     {cls.teacher.profile_picture ? (
                       <img src={cls.teacher.profile_picture} alt="" className="h-full w-full object-cover" />
                     ) : (
-                      <span className="font-bold text-amber-300" aria-hidden="true">{cls.teacher.name?.charAt(0)}</span>
+                      <span className="font-bold text-red-300" aria-hidden="true">{cls.teacher.name?.charAt(0)}</span>
                     )}
                   </span>
                   <span>
@@ -223,7 +223,7 @@ export default function ClassDetailsModal({ isOpen, onClose, cls, onUserClick, o
               <div className="rounded-xl border border-white/5 bg-slate-800/50 p-4">
                 <p className="mb-1 text-xs font-bold uppercase text-slate-400">Fecha y hora</p>
                 <p className="font-bold text-white">{new Date(cls.start_time).toLocaleDateString()}</p>
-                <p className="font-semibold text-amber-300">
+                <p className="font-semibold text-red-300">
                   {new Date(cls.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} – {new Date(cls.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </p>
               </div>

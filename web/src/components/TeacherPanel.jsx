@@ -49,7 +49,7 @@ export default function TeacherPanel({ siteName, onUserClick, realtimeVersion = 
     <div className="space-y-6">
       <section className="glass flex flex-col items-start justify-between gap-4 rounded-[1.5rem] p-5 sm:flex-row sm:items-center" aria-labelledby="teacher-schedule-heading">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.18em] text-[#f4a621]">Programación</p>
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-[#ff5a47]">Programación</p>
           <h2 id="teacher-schedule-heading" className="text-xl font-black tracking-[-.025em] text-white">Gestiona tus clases</h2>
         </div>
         <button

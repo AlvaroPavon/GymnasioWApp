@@ -70,8 +70,8 @@ export default function Dashboard() {
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <HouseLine size={16} weight="fill" className="shrink-0 text-[#f4a621]" aria-hidden="true" />
-            <p className="truncate text-[10px] font-black uppercase tracking-[.18em] text-[#f4a621] sm:text-xs">Panel principal</p>
+            <HouseLine size={16} weight="fill" className="shrink-0 text-[#ff5a47]" aria-hidden="true" />
+            <p className="truncate text-[10px] font-black uppercase tracking-[.18em] text-[#ff5a47] sm:text-xs">Panel principal</p>
           </div>
           <h1 className="truncate text-lg font-black tracking-[-.025em] text-white sm:text-2xl">{settings.app_name}</h1>
         </div>
@@ -98,7 +98,7 @@ export default function Dashboard() {
             <span className="block max-w-36 truncate text-sm font-black text-zinc-100">{user?.name}</span>
             <span className="block text-[10px] font-black uppercase tracking-[.12em] text-zinc-500">{ROLE_LABELS[user?.role] || user?.role}</span>
           </span>
-          <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl border border-[#f4a621]/35 bg-[#211a10] text-[#ffc65c] shadow-[0_0_24px_rgba(244,166,33,.13)]">
+          <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl border border-[#ff5a47]/35 bg-[#211a10] text-[#ff8a7d] shadow-[0_0_24px_rgba(255,90,71,.13)]">
             {user?.profile_picture ? (
               <img src={user.profile_picture} alt="Avatar" className="h-full w-full object-cover" />
             ) : (
@@ -137,7 +137,7 @@ export default function Dashboard() {
           href={PRIVACY_POLICY_URL}
           target="_blank"
           rel="noreferrer"
-          className="ml-2 text-zinc-400 underline decoration-zinc-600 underline-offset-4 transition-colors hover:text-[#ffc65c]"
+          className="ml-2 text-zinc-400 underline decoration-zinc-600 underline-offset-4 transition-colors hover:text-[#ff8a7d]"
         >
           Política de privacidad
         </a>

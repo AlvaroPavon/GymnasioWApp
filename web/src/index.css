@@ -3,7 +3,7 @@
 @theme {
   --color-gym-dark: #09090b;
   --color-gym-card: #18181b;
-  --color-gym-accent: #f4a621;
+  --color-gym-accent: #ff5a47;
   --color-gym-highlight: #ff6b4a;
   --color-gym-warning: #ef4444;
   --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -13,8 +13,8 @@
   color-scheme: dark;
   --brand-ink: #071a2f;
   --brand-navy: #0a3158;
-  --brand-gold: #f4a621;
-  --brand-gold-soft: #ffc65c;
+  --brand-gold: #ff5a47;
+  --brand-gold-soft: #ff8a7d;
   --brand-coral: #ff6848;
   --surface-base: #09090b;
   --surface-raised: #141416;
@@ -32,7 +32,7 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
   background:
-    radial-gradient(circle at 88% -10%, rgba(244, 166, 33, 0.13), transparent 28rem),
+    radial-gradient(circle at 88% -10%, rgba(255, 90, 71, 0.13), transparent 28rem),
     radial-gradient(circle at -8% 92%, rgba(10, 49, 88, 0.22), transparent 34rem),
     var(--surface-base);
   background-attachment: fixed;
@@ -47,6 +47,36 @@ body {
 button, input, select, textarea { font: inherit; }
 button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 button { cursor: pointer; }
+select {
+  color-scheme: dark;
+  appearance: none;
+  -webkit-appearance: none;
+  min-height: 2.75rem;
+  padding-right: 2.8rem !important;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #ff8a7d 50%),
+    linear-gradient(135deg, #ff8a7d 50%, transparent 50%);
+  background-position:
+    calc(100% - 1.15rem) 50%,
+    calc(100% - .82rem) 50%;
+  background-size: .36rem .36rem, .36rem .36rem;
+  background-repeat: no-repeat;
+  border-color: rgba(255, 255, 255, .12);
+  background-color: rgba(18, 18, 20, .96);
+  color: var(--text-primary);
+  transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+}
+select:hover { border-color: rgba(255, 90, 71, .42); }
+select:focus-visible {
+  border-color: rgba(255, 90, 71, .88);
+  box-shadow: 0 0 0 4px rgba(255, 90, 71, .14);
+}
+select:disabled { cursor: not-allowed; opacity: .58; }
+select option,
+select optgroup {
+  color: #fafafa;
+  background: #18181b;
+}
 ::selection { color: #17110a; background: var(--brand-gold-soft); }
 ::-webkit-scrollbar { width: 7px; height: 7px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -63,7 +93,7 @@ button { cursor: pointer; }
 .glass-hover:hover {
   transform: translateY(-2px);
   background: rgba(36, 36, 40, 0.94);
-  border-color: rgba(244, 166, 33, 0.26);
+  border-color: rgba(255, 90, 71, 0.26);
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
 }
 .text-gradient {
@@ -79,7 +109,7 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible { outline: 2px solid var(--brand-gold); outline-offset: 3px; }
 .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
-.custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(244, 166, 33, 0.55); border-radius: 999px; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 90, 71, 0.55); border-radius: 999px; }
 .animate-fade-in { animation: pageReveal 480ms cubic-bezier(.2,.8,.2,1) both; }
 @keyframes pageReveal {
   from { opacity: 0; transform: translateY(12px) scale(0.992); }

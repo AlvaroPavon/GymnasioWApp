@@ -224,22 +224,22 @@ export default function UserProfileModal({ isOpen, onClose, viewUser = null }) {
                 </div>
               )}
               {isAdmin && !isMe && (
-                <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-3">
-                  <label className="block text-xs text-amber-200 mb-1">Restablecer contraseña</label>
+                <div className="rounded-xl border border-red-400/30 bg-red-400/10 p-3">
+                  <label className="block text-xs text-red-200 mb-1">Restablecer contraseña</label>
                   <input
                     type="password"
                     autoComplete="new-password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="Nueva contraseña"
-                    className="w-full bg-slate-950 border border-amber-400/30 text-slate-100 p-2 rounded-lg text-sm"
+                    className="w-full bg-slate-950 border border-red-400/30 text-slate-100 p-2 rounded-lg text-sm"
                   />
-                  <p className="text-[11px] text-amber-100/70 mt-2">Usalo solo cuando el usuario no pueda acceder a su cuenta.</p>
+                  <p className="text-[11px] text-red-100/70 mt-2">Usalo solo cuando el usuario no pueda acceder a su cuenta.</p>
                   <button
                     type="button"
                     onClick={handlePasswordReset}
                     disabled={passwordLoading || newPassword.trim().length < 8}
-                    className="mt-3 w-full bg-amber-400 hover:bg-amber-300 disabled:opacity-50 font-bold p-2 rounded-lg text-slate-950 transition-colors"
+                    className="mt-3 w-full bg-red-400 hover:bg-red-300 disabled:opacity-50 font-bold p-2 rounded-lg text-slate-950 transition-colors"
                   >
                     {passwordLoading ? 'Cambiando...' : 'Cambiar contraseña'}
                   </button>
@@ -266,13 +266,13 @@ export default function UserProfileModal({ isOpen, onClose, viewUser = null }) {
                   type="file"
                   accept="image/*"
                   onChange={(e) => setSelectedFile(e.target.files[0])}
-                  className="w-full bg-slate-900 border border-slate-700 text-slate-200 p-2 rounded-lg text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-gym-accent file:text-white hover:file:bg-amber-500"
+                  className="w-full bg-slate-900 border border-slate-700 text-slate-200 p-2 rounded-lg text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-gym-accent file:text-white hover:file:bg-red-500"
                 />
               </div>
               <button
                 onClick={handleUpdate}
                 disabled={loading}
-                className="w-full bg-gym-accent hover:bg-amber-500 disabled:opacity-50 font-bold p-3 rounded-lg text-white transition-colors"
+                className="w-full bg-gym-accent hover:bg-red-500 disabled:opacity-50 font-bold p-3 rounded-lg text-white transition-colors"
               >
                 {loading ? 'Guardando...' : 'Guardar Cambios'}
               </button>

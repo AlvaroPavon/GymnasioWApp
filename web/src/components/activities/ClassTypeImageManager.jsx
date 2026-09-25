@@ -4,6 +4,97 @@ import './activities.css';
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const MAX_FILE_SIZE = 4 * 1024 * 1024;
 
+function fileValidationMessage(file) {
+  if (!ALLOWED_TYPES.has(file.type)) return 'Usa una imagen JPG, PNG o WebP.';
+  if (file.size > MAX_FILE_SIZE) return 'La imagen no puede superar los 4 MB.';
+  return '';
+}
+
+function CreateClassTypeCard({ onCreate }) {
+  const [name, setName] = useState('');
+  const [file, setFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState('');
+  const [inputKey, setInputKey] = useState(0);
+  const [status, setStatus] = useState({ kind: 'idle', message: '' });
+
+  useEffect(() => () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+  }, [previewUrl]);
+
+  const selectFile = (event) => {
+    const nextFile = event.target.files?.[0] || null;
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl('');
+    setFile(null);
+    setStatus({ kind: 'idle', message: '' });
+    if (!nextFile) return;
+
+    const validationMessage = fileValidationMessage(nextFile);
+    if (validationMessage) {
+      setStatus({ kind: 'error', message: validationMessage });
+      event.target.value = '';
+      return;
+    }
+
+    setFile(nextFile);
+    setPreviewUrl(URL.createObjectURL(nextFile));
+  };
+
+  const submit = async (event) => {
+    event.preventDefault();
+    const normalizedName = name.trim();
+    if (normalizedName.length < 2 || !file) return;
+
+    setStatus({ kind: 'loading', message: 'Creando actividad…' });
+    try {
+      await onCreate(normalizedName, file);
+      setName('');
+      setFile(null);
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setPreviewUrl('');
+      setInputKey((current) => current + 1);
+      setStatus({ kind: 'success', message: 'Actividad creada. Sus nuevas clases usarán esta imagen automáticamente.' });
+    } catch (error) {
+      setStatus({ kind: 'error', message: error.message || 'No se pudo crear la actividad.' });
+    }
+  };
+
+  return (
+    <form className="class-type-create" onSubmit={submit}>
+      <div className="class-type-create__copy">
+        <p>Nueva actividad</p>
+        <h3>Crear tipo e imagen</h3>
+        <span>Por ejemplo, “Zumba”. Al seleccionarla al crear una clase, su imagen se asignará automáticamente.</span>
+      </div>
+      <div className="class-type-create__preview">
+        {previewUrl ? <img src={previewUrl} alt="Vista previa de la nueva actividad" /> : <span>Vista previa</span>}
+      </div>
+      <div className="class-type-create__fields">
+        <label>
+          <span>Nombre de la actividad</span>
+          <input
+            type="text"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            minLength={2}
+            maxLength={80}
+            placeholder="Zumba"
+            required
+          />
+        </label>
+        <label>
+          <span>Imagen del calendario</span>
+          <input key={inputKey} type="file" accept="image/jpeg,image/png,image/webp" onChange={selectFile} required />
+        </label>
+        <button type="submit" disabled={name.trim().length < 2 || !file || status.kind === 'loading'}>
+          {status.kind === 'loading' ? 'Creando…' : 'Crear actividad'}
+        </button>
+        <p className={`upload-feedback upload-feedback--${status.kind}`} aria-live="polite">{status.message}</p>
+      </div>
+    </form>
+  );
+}
+
 function ClassTypeImageCard({ classType, onUpload }) {
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
@@ -21,13 +112,9 @@ function ClassTypeImageCard({ classType, onUpload }) {
     setStatus({ kind: 'idle', message: '' });
 
     if (!nextFile) return;
-    if (!ALLOWED_TYPES.has(nextFile.type)) {
-      setStatus({ kind: 'error', message: 'Usa una imagen JPG, PNG o WebP.' });
-      event.target.value = '';
-      return;
-    }
-    if (nextFile.size > MAX_FILE_SIZE) {
-      setStatus({ kind: 'error', message: 'La imagen no puede superar los 4 MB.' });
+    const validationMessage = fileValidationMessage(nextFile);
+    if (validationMessage) {
+      setStatus({ kind: 'error', message: validationMessage });
       event.target.value = '';
       return;
     }
@@ -79,7 +166,7 @@ function ClassTypeImageCard({ classType, onUpload }) {
   );
 }
 
-export default function ClassTypeImageManager({ classTypes, onUpload }) {
+export default function ClassTypeImageManager({ classTypes, onUpload, onCreate }) {
   return (
     <section className="class-type-images" aria-labelledby="class-type-images-heading">
       <div className="class-type-images__heading">
@@ -90,10 +177,12 @@ export default function ClassTypeImageManager({ classTypes, onUpload }) {
         <span>JPG, PNG o WebP · máximo 4 MB</span>
       </div>
 
+      <CreateClassTypeCard onCreate={onCreate} />
+
       {classTypes.length === 0 ? (
         <div className="activities-state">
           <strong>No hay tipos de clase configurados</strong>
-          <p>Creá un tipo de actividad antes de asignarle una imagen.</p>
+          <p>Crea la primera actividad con el formulario anterior.</p>
         </div>
       ) : (
         <div className="class-type-images__grid">

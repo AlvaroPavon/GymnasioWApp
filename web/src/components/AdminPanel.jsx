@@ -20,6 +20,12 @@ const ADMIN_NAV = [
   { id: 'settings', label: 'Ajustes', description: 'Personalización', icon: SlidersHorizontal }
 ];
 
+const ROLE_LABELS = {
+  ADMIN: 'Administrador',
+  TEACHER: 'Profesor',
+  CLIENT: 'Cliente'
+};
+
 export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 }) {
   const { user: currentUser } = useAuth();
   const [tab, setTab] = useState('classes'); // 'classes' | 'users' | 'images'
@@ -236,6 +242,21 @@ export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 
     }
   };
 
+  const createClassType = async (name, file) => {
+    const formData = new FormData();
+    formData.append('name', name);
+    formData.append('image', file);
+    try {
+      const response = await axios.post(`${API_URL}/class-types`, formData);
+      setClassTypes((current) => [...current, response.data].sort((left, right) => (
+        (left.name || left.nombre).localeCompare(right.name || right.nombre, 'es')
+      )));
+      return response.data;
+    } catch (error) {
+      throw new Error(getApiErrorMessage(error, 'No se pudo crear la actividad.'));
+    }
+  };
+
   const createClass = async (e) => {
     e.preventDefault();
     try {
@@ -322,7 +343,7 @@ export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 
       <aside className="w-full flex-shrink-0 lg:w-72" aria-label="Navegación de administración">
         <div className="nav-surface sticky top-28 rounded-[1.7rem] p-3">
           <div className="mb-3 px-3 pb-2 pt-3">
-            <p className="text-[10px] font-black uppercase tracking-[.2em] text-[#f4a621]">Administración</p>
+            <p className="text-[10px] font-black uppercase tracking-[.2em] text-[#ff5a47]">Administración</p>
             <h2 className="mt-1 text-xl font-black tracking-[-.03em] text-white">Centro de control</h2>
           </div>
           <nav className="grid grid-cols-2 gap-2 lg:grid-cols-1">
@@ -339,7 +360,7 @@ export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 
                   {active && (
                     <motion.span
                       layoutId="admin-active-tab"
-                      className="absolute inset-0 bg-gradient-to-r from-[#ffd36e] to-[#f4a621] shadow-[0_10px_28px_rgba(244,166,33,.22)]"
+                      className="absolute inset-0 bg-gradient-to-r from-[#ff8a7d] to-[#ff5a47] shadow-[0_10px_28px_rgba(255,90,71,.24)]"
                       transition={{ type: 'spring', stiffness: 340, damping: 30 }}
                     />
                   )}
@@ -376,7 +397,7 @@ export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 
         <div className="space-y-8">
           <section className="glass rounded-xl p-6" aria-labelledby="create-class-heading">
             <div className="mb-5">
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-300">Programación</p>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#ff8a7d]">Programación</p>
               <h2 id="create-class-heading" className="text-2xl font-bold text-white">Crear nueva clase</h2>
             </div>
             <form onSubmit={createClass} className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -416,7 +437,7 @@ export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 
                 <input type="datetime-local" required value={endTime} onChange={event => setEndTime(event.target.value)} className="w-full bg-slate-900 border border-slate-700 p-3 rounded text-white" />
               </label>
               <fieldset className="rounded-xl border border-slate-700 bg-slate-950/50 p-4 md:col-span-2">
-                <legend className="px-2 text-xs font-bold text-amber-300">Alumnos fijos</legend>
+                <legend className="px-2 text-xs font-bold text-[#ff8a7d]">Alumnos fijos</legend>
                 <p className="mb-3 text-xs text-slate-500">Quedarán confirmados automáticamente en cada semana creada.</p>
                 {eligibleClients.length > 0 ? (
                   <div className="grid max-h-48 gap-2 overflow-y-auto pr-1 sm:grid-cols-2 lg:grid-cols-3">
@@ -436,7 +457,7 @@ export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 
                   <p className="text-xs text-slate-500">No hay clientes con cuota activa.</p>
                 )}
               </fieldset>
-              <button type="submit" className="md:col-span-2 bg-gradient-to-r from-amber-300 to-amber-500 hover:from-amber-200 hover:to-amber-400 text-[#19120a] font-bold p-3 rounded-lg shadow-lg shadow-amber-500/10 transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400">
+              <button type="submit" className="md:col-span-2 bg-gradient-to-r from-[#ff8a7d] to-[#ff5a47] hover:brightness-110 text-[#111216] font-bold p-3 rounded-lg shadow-lg shadow-red-500/10 transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5a47]">
                 {Number(repeatWeeks) > 1 ? `Crear ${repeatWeeks} clases` : 'Crear clase'}
               </button>
             </form>
@@ -461,11 +482,11 @@ export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 
       {tab === 'images' && (
         <div className="space-y-8">
           <section className="glass rounded-xl p-6">
-            <ClassTypeImageManager classTypes={classTypes} onUpload={uploadClassTypeImage} />
+            <ClassTypeImageManager classTypes={classTypes} onUpload={uploadClassTypeImage} onCreate={createClassType} />
           </section>
 
           <section className="glass rounded-xl p-6">
-          <h2 className="text-2xl font-bold mb-2 text-amber-300">Banco de imágenes heredado</h2>
+          <h2 className="text-2xl font-bold mb-2 text-[#ff8a7d]">Banco de imágenes heredado</h2>
           <p className="text-sm text-slate-400 mb-5">Conserva las reglas por palabra clave para clases antiguas que todavía no tengan imagen de tipo.</p>
           <form onSubmit={async (e) => {
             e.preventDefault();
@@ -473,9 +494,9 @@ export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 
             try { await axios.post(`${API_URL}/image-bank`, obj); fetchImages(); e.target.reset(); }
             catch(err) { alert('Error añadiendo imagen (¿keyword duplicada?)'); }
           }} className="flex flex-col sm:flex-row gap-4 mb-6">
-            <input name="kw" type="text" placeholder="Keyword (ej. yoga)" required className="flex-1 bg-slate-900 border border-slate-700 p-3 rounded" />
+            <input name="kw" type="text" placeholder="Palabra clave (ej. yoga)" required className="flex-1 bg-slate-900 border border-slate-700 p-3 rounded" />
             <input name="url" type="url" placeholder="https://unsplash..." required className="flex-[2] bg-slate-900 border border-slate-700 p-3 rounded" />
-            <button type="submit" className="bg-amber-500 hover:bg-amber-400 font-bold p-3 rounded-lg text-slate-950 shadow shadow-amber-500/10">Añadir imagen</button>
+            <button type="submit" className="bg-[#ff5a47] hover:bg-[#ff6b59] font-bold p-3 rounded-lg text-[#111216] shadow shadow-red-500/10">Añadir imagen</button>
           </form>
 
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
@@ -495,60 +516,60 @@ export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 
 
       {/* VIEW: USUARIOS */}
       {tab === 'users' && (
-        <section className="glass rounded-xl p-6 overflow-x-auto">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-gym-accent">Directorio de Usuarios</h2>
+        <section className="glass rounded-xl p-4 sm:p-6">
+          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-[#ff8a7d]">Administración</p>
+              <h2 className="text-2xl font-bold text-white">Directorio de usuarios</h2>
+            </div>
             <button
               onClick={() => setIsCreateUserOpen(true)}
-              className="bg-amber-500 hover:bg-amber-400 text-white font-bold py-2 px-4 rounded-lg shadow-lg transition-colors flex items-center gap-2"
+              className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#ff5a47] px-4 py-2 font-bold text-[#111216] shadow-lg shadow-red-500/10 transition hover:-translate-y-0.5 hover:bg-[#ff6b59]"
             >
-              <span>+</span> Nuevo Usuario
+              <span aria-hidden="true">+</span> Nuevo usuario
             </button>
           </div>
 
-          <table className="w-full text-left border-collapse">
-            <thead>
-                <tr className="border-b border-white/10 text-slate-400">
-                  <th className="py-2">Nombre</th>
-                  <th className="py-2">Email</th>
-                  <th className="py-2">Rol</th>
-                  <th className="py-2">Mensualidad</th>
-                  <th className="py-2">Vence</th>
-                  <th className="py-2">Registro</th>
-                  <th className="py-2">Acción</th>
-                </tr>
-            </thead>
-            <tbody>
-              {users.map(u => (
-                <tr key={u.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                  <td className="py-3 font-semibold">{u.name}</td>
-                  <td className="py-3 text-slate-400">{u.email}</td>
-                  <td className="py-3">
-                    <span className={`px-2 py-1 rounded text-xs font-bold ${u.role==='ADMIN'?'bg-red-500/20 text-red-500':u.role==='TEACHER'?'bg-amber-500/20 text-amber-500':'bg-gym-highlight/20 text-gym-highlight'}`}>
-                      {u.role}
+          <div className="grid min-w-0 gap-4 xl:grid-cols-2">
+            {users.map((u) => (
+              <article key={u.id} className="min-w-0 rounded-2xl border border-white/10 bg-black/20 p-4 transition hover:border-white/20 hover:bg-white/[0.035]">
+                <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <h3 className="break-words text-lg font-black text-white">{u.name}</h3>
+                    <p className="break-all text-sm text-slate-400">{u.email}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <span className={`rounded-full px-2.5 py-1 text-[11px] font-black ${u.role === 'ADMIN' ? 'bg-red-500/20 text-red-300' : u.role === 'TEACHER' ? 'bg-blue-500/20 text-blue-300' : 'bg-slate-500/20 text-slate-300'}`}>
+                      {ROLE_LABELS[u.role] || u.role}
                     </span>
-                  </td>
-                  <td className="py-3">
-                    <span className={`px-2 py-1 rounded text-xs font-bold ${u.estado_mensualidad === 'PAGADO' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
-                      {u.role === 'CLIENT' ? u.estado_mensualidad : 'EXENTO'}
+                    <span className={`rounded-full px-2.5 py-1 text-[11px] font-black ${u.role !== 'CLIENT' || u.estado_mensualidad === 'PAGADO' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}`}>
+                      {u.role === 'CLIENT' ? u.estado_mensualidad : 'Exento'}
                     </span>
-                  </td>
-                  <td className="py-3 text-slate-400 text-sm">
-                    {u.role === 'CLIENT' && u.membership_expires_at ? new Date(u.membership_expires_at).toLocaleDateString() : '—'}
-                  </td>
-                  <td className="py-3 text-slate-400 text-sm">{u.created_at ? new Date(u.created_at).toLocaleDateString() : '-'}</td>
-                  <td className="py-3 flex gap-2">
-                    <button onClick={() => onUserClick(u)} className="bg-amber-500/20 text-amber-400 px-3 py-1 rounded hover:bg-amber-400 hover:text-white transition-colors">Editar</button>
-                    <button onClick={() => openPasswordReset(u)} className="bg-amber-500/20 text-amber-300 px-3 py-1 rounded hover:bg-amber-500 hover:text-slate-950 transition-colors">Cambiar contraseña</button>
-                    {u.role === 'CLIENT' && (
-                      <button onClick={() => renewMembership(u.id)} className="bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded hover:bg-emerald-500 hover:text-white transition-colors">Renovar</button>
-                    )}
-                    <button onClick={() => deleteUser(u.id)} className="bg-gym-warning/20 text-gym-warning px-3 py-1 rounded hover:bg-gym-warning hover:text-white transition-colors">Eliminar</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                </div>
+
+                <dl className="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-black/20 p-3 text-sm">
+                  <div className="min-w-0">
+                    <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">Vencimiento</dt>
+                    <dd className="mt-1 text-slate-200">{u.role === 'CLIENT' && u.membership_expires_at ? new Date(u.membership_expires_at).toLocaleDateString('es-ES') : '—'}</dd>
+                  </div>
+                  <div className="min-w-0">
+                    <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">Registro</dt>
+                    <dd className="mt-1 text-slate-200">{u.created_at ? new Date(u.created_at).toLocaleDateString('es-ES') : '—'}</dd>
+                  </div>
+                </dl>
+
+                <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                  <button onClick={() => onUserClick(u)} className="min-h-10 rounded-xl bg-[#ff5a47]/20 px-3 py-2 text-sm font-bold text-[#ff8a7d] transition hover:bg-[#ff5a47] hover:text-[#111216]">Editar</button>
+                  <button onClick={() => openPasswordReset(u)} className="min-h-10 rounded-xl bg-white/10 px-3 py-2 text-sm font-bold text-slate-200 transition hover:bg-white/20">Cambiar contraseña</button>
+                  {u.role === 'CLIENT' && (
+                    <button onClick={() => renewMembership(u.id)} className="min-h-10 rounded-xl bg-emerald-500/20 px-3 py-2 text-sm font-bold text-emerald-300 transition hover:bg-emerald-500 hover:text-white">Renovar</button>
+                  )}
+                  <button onClick={() => deleteUser(u.id)} className="min-h-10 rounded-xl bg-red-500/15 px-3 py-2 text-sm font-bold text-red-300 transition hover:bg-red-500 hover:text-white">Eliminar</button>
+                </div>
+              </article>
+            ))}
+          </div>
         </section>
       )}
 
@@ -558,7 +579,7 @@ export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 
 
           {/* Rentabilidad por Categoría */}
           <section className="glass rounded-xl p-6 overflow-x-auto">
-            <h2 className="text-2xl font-bold mb-4 text-amber-300">Rentabilidad por Categoría (Histórico Acumulado)</h2>
+            <h2 className="text-2xl font-bold mb-4 text-[#ff8a7d]">Rentabilidad por Categoría (Histórico Acumulado)</h2>
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-white/10 text-slate-400">
@@ -595,12 +616,12 @@ export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 
           {/* Control de Horas del Profesor */}
           <section className="glass rounded-xl p-6 overflow-x-auto">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-amber-400">Control de Horas del Profesor</h2>
+              <h2 className="text-2xl font-bold text-[#ff8a7d]">Control de Horas del Profesor</h2>
               <input
                 type="month"
                 value={filterMonth}
                 onChange={e => setFilterMonth(e.target.value)}
-                className="bg-slate-900 border border-slate-700 p-2 rounded-lg text-white font-bold focus:outline-none focus:border-amber-500"
+                className="bg-slate-900 border border-slate-700 p-2 rounded-lg text-white font-bold focus:outline-none focus:border-[#ff5a47]"
               />
             </div>
 
@@ -618,7 +639,7 @@ export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 
                 {teacherStats.map((st, i) => (
                   <tr key={i} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                     <td className="py-3 font-bold text-white">{st.name}</td>
-                    <td className="py-3 text-amber-400 font-extrabold">{st.hours.toFixed(1)} h</td>
+                    <td className="py-3 text-[#ff8a7d] font-extrabold">{st.hours.toFixed(1)} h</td>
                     <td className="py-3 text-slate-400">{st.classesCount} módulos terminados</td>
                     <td className="py-3 text-slate-400">{st.attendeesCount} asientos</td>
                   </tr>
@@ -696,7 +717,7 @@ export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 
       {/* VIEW: SETTINGS (WHITE LABELING) */}
       {tab === 'settings' && (
         <section className="glass rounded-xl p-8 max-w-2xl mx-auto animate-fade-in relative z-10">
-          <h2 className="text-3xl font-extrabold text-amber-500 mb-6 tracking-tight">Marca Blanca & UI</h2>
+          <h2 className="text-3xl font-extrabold text-[#ff5a47] mb-6 tracking-tight">Marca Blanca & UI</h2>
           <p className="text-slate-400 mb-8 font-medium">Personaliza la identidad corporativa de la aplicación para adaptar el sistema a tu modelo de negocio.</p>
 
           <form onSubmit={handleUpdateSettings} className="space-y-6">
@@ -707,7 +728,7 @@ export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 
                 value={appSettings.app_name}
                 onChange={e => setAppSettings({...appSettings, app_name: e.target.value})}
                 placeholder="Ej. Titanium Fitness"
-                className="w-full bg-slate-900/60 border border-slate-700/50 rounded-xl p-4 text-white focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all font-semibold"
+                className="w-full bg-slate-900/60 border border-slate-700/50 rounded-xl p-4 text-white focus:outline-none focus:ring-2 focus:ring-[#ff5a47] transition-all font-semibold"
                 required
               />
             </div>
@@ -718,7 +739,7 @@ export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 
                 type="file"
                 accept="image/*"
                 onChange={e => setHeroImageFile(e.target.files[0])}
-                className="w-full bg-slate-900/60 border border-slate-700/50 rounded-xl p-4 text-slate-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-amber-500 file:text-slate-900 hover:file:bg-amber-400 focus:outline-none transition-all cursor-pointer"
+                className="w-full bg-slate-900/60 border border-slate-700/50 rounded-xl p-4 text-slate-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[#ff5a47] file:text-[#111216] hover:file:bg-[#ff6b59] focus:outline-none transition-all cursor-pointer"
               />
               {appSettings.hero_image && !heroImageFile && (
                 <div className="mt-4">
@@ -730,7 +751,7 @@ export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 
 
             <button
               type="submit"
-              className="w-full bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 tracking-wide text-gray-900 font-extrabold py-4 px-4 rounded-xl shadow-[0_10px_30px_rgba(245,158,11,0.2)] transition-transform transform hover:scale-[1.02]"
+              className="w-full bg-gradient-to-r from-[#e44335] to-[#ff5a47] hover:brightness-110 tracking-wide text-[#111216] font-extrabold py-4 px-4 rounded-xl shadow-[0_10px_30px_rgba(255,90,71,0.2)] transition-transform transform hover:scale-[1.02]"
             >
               Guardar Configuración Global
             </button>
@@ -768,9 +789,9 @@ export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 
       {passwordUser && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={closePasswordReset}></div>
-          <form onSubmit={resetUserPassword} className="relative w-full max-w-md bg-slate-900 border border-amber-500/30 rounded-2xl p-6 shadow-2xl">
+          <form onSubmit={resetUserPassword} className="relative w-full max-w-md bg-slate-900 border border-[#ff5a47]/30 rounded-2xl p-6 shadow-2xl">
             <button type="button" onClick={closePasswordReset} className="absolute top-4 right-4 text-slate-400 hover:text-white">x</button>
-            <h2 className="text-2xl font-bold text-amber-300 mb-2">Cambiar contraseña</h2>
+            <h2 className="text-2xl font-bold text-[#ff8a7d] mb-2">Cambiar contraseña</h2>
             <p className="text-sm text-slate-400 mb-5">
               Usuario: <span className="font-bold text-white">{passwordUser.name}</span>
             </p>
@@ -788,7 +809,7 @@ export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 
             <button
               type="submit"
               disabled={passwordLoading || passwordValue.trim().length < 8}
-              className="mt-5 w-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-bold p-3 rounded-lg transition-colors"
+              className="mt-5 w-full bg-[#ff5a47] hover:bg-[#ff6b59] disabled:opacity-50 text-[#111216] font-bold p-3 rounded-lg transition-colors"
             >
               {passwordLoading ? 'Cambiando...' : 'Guardar nueva contraseña'}
             </button>
