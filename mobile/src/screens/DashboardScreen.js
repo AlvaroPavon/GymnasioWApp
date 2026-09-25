@@ -68,7 +68,13 @@ const roleTabs = {
   CLIENT: [['classes', 'Reservas']]
 };
 const url = (path) => `${getApiBaseUrl()}${path}`;
-const errorText = (e, fallback) => e?.response?.data?.error?.message || e?.response?.data?.message || e?.message || fallback;
+const errorText = (error, fallback) => {
+  const apiMessage = error?.response?.data?.error?.message || error?.response?.data?.message;
+  if (apiMessage) return apiMessage;
+  if (error?.code === 'ECONNABORTED') return 'La solicitud tardó demasiado. Inténtalo de nuevo.';
+  if (error?.isAxiosError || error?.code === 'ERR_NETWORK') return 'No se pudo conectar con el servidor. Revisa tu conexión.';
+  return fallback;
+};
 const nextHourForm = () => {
   const start = new Date(Date.now() + 60 * 60 * 1000);
   const end = new Date(start.getTime() + 60 * 60 * 1000);
@@ -105,7 +111,7 @@ function Chip({ text, onPress }) {
 }
 
 function PreferenceToggle({ label, description, value, onValueChange, disabled = false }) {
-  return <View style={styles.preferenceRow}><View style={styles.preferenceCopy}><Text style={styles.preferenceLabel}>{label}</Text><Text style={styles.preferenceDescription}>{description}</Text></View><Switch accessibilityLabel={label} disabled={disabled} value={!!value} onValueChange={onValueChange} trackColor={{ false: '#3f3f46', true: COLORS.gold }} thumbColor={value ? '#fff7e6' : '#d4d4d8'} /></View>;
+  return <View style={styles.preferenceRow}><View style={styles.preferenceCopy}><Text style={styles.preferenceLabel}>{label}</Text><Text style={styles.preferenceDescription}>{description}</Text></View><Switch accessibilityLabel={label} disabled={disabled} value={!!value} onValueChange={onValueChange} trackColor={{ false: '#3f3f46', true: COLORS.accent }} thumbColor={value ? '#ffffff' : '#d4d4d8'} /></View>;
 }
 
 function Sheet({ visible, title, onClose, children, compact = false, insets, bottomInset }) {
@@ -164,7 +170,6 @@ export default function DashboardScreen({ navigation }) {
   const [notes, setNotes] = useState([]);
   const [settings, setSettings] = useState(null);
   const [tab, setTab] = useState('classes');
-  const [menuOpen, setMenuOpen] = useState(false);
   const [classFormOpen, setClassFormOpen] = useState(false);
   const [typeFormOpen, setTypeFormOpen] = useState(false);
   const [userFormOpen, setUserFormOpen] = useState(false);
@@ -262,7 +267,6 @@ export default function DashboardScreen({ navigation }) {
   const resetRoleScopedState = (nextRole) => {
     if (nextRole !== me?.role) {
       setTab('classes');
-      setMenuOpen(false);
       setClassFormOpen(false);
       setTypeFormOpen(false);
       setUserFormOpen(false);
@@ -411,8 +415,7 @@ export default function DashboardScreen({ navigation }) {
   const openNewUser = () => { setEditingUser(null); setUserForm(emptyUser()); setPasswordReset(''); setUserFormOpen(true); };
   const resetUser = () => { setEditingUser(null); setUserForm(emptyUser()); setPasswordReset(''); setUserFormOpen(false); };
   const openTab = (nextTab) => {
-    setMenuOpen(false);
-    setTimeout(() => setTab(nextTab), 90);
+    setTab(nextTab);
   };
 
   const saveClass = async () => {
@@ -445,7 +448,7 @@ export default function DashboardScreen({ navigation }) {
       const createdCount = Number(response?.data?.createdCount ?? response?.data?.created_count ?? 1);
       showNotice(editingClass ? 'Clase actualizada.' : createdCount > 1 ? `${createdCount} clases creadas.` : 'Clase creada.');
       resetClass(); await fetchAll(me?.role, true);
-    } catch (e) { Alert.alert('Error', errorText(e, e.message || 'No se pudo guardar la clase.')); }
+    } catch (e) { Alert.alert('Error', errorText(e, 'No se pudo guardar la clase. Revisa los datos introducidos.')); }
   };
 
   const fillClass = (c) => {
@@ -467,7 +470,7 @@ export default function DashboardScreen({ navigation }) {
       if (editingUser) await axios.put(url(`/users/${editingUser}`), payload); else await axios.post(url('/users'), payload);
       showNotice(editingUser ? 'Usuario actualizado.' : 'Usuario creado.');
       resetUser(); await fetchAll(me?.role, true);
-    } catch (e) { Alert.alert('Error', errorText(e, e.message || 'No se pudo guardar el usuario.')); }
+    } catch (e) { Alert.alert('Error', errorText(e, 'No se pudo guardar el usuario. Revisa los datos introducidos.')); }
   };
 
   const resetUserPassword = async () => {
@@ -480,7 +483,7 @@ export default function DashboardScreen({ navigation }) {
       setPasswordReset('');
       showNotice('Contraseña actualizada.');
     } catch (e) {
-      Alert.alert('Error', errorText(e, e.message || 'No se pudo cambiar la contraseña.'));
+      Alert.alert('Error', errorText(e, 'No se pudo cambiar la contraseña. Revisa que tenga al menos 8 caracteres.'));
     }
   };
 
@@ -551,7 +554,7 @@ export default function DashboardScreen({ navigation }) {
       setTypeImageAsset(prepared);
       setTypeImageFeedback({ tone: 'success', message: 'Imagen lista para subir. Revisá la vista previa.' });
     } catch (e) {
-      const message = errorText(e, e?.message || 'No se pudo seleccionar la imagen.');
+      const message = errorText(e, 'No se pudo seleccionar la imagen. Comprueba el formato y el tamaño.');
       setTypeImageFeedback({ tone: 'error', message });
       Alert.alert('Error al seleccionar', message);
     }
@@ -628,7 +631,7 @@ export default function DashboardScreen({ navigation }) {
     }
   };
   const validateAttendance = async (classId) => { try { await axios.post(url(`/classes/${classId}/attendance/validate`)); showNotice('Asistencia validada.'); await fetchAll(me?.role, true); } catch (e) { Alert.alert('Error', errorText(e, 'No se pudo validar.')); } };
-  const reportPayment = async () => { try { await axios.post(url('/membership/payments'), { notes: 'Payment reported from mobile app' }); showNotice('Pago notificado al administrador.'); } catch (e) { Alert.alert('Error', errorText(e, 'No se pudo notificar.')); } };
+  const reportPayment = async () => { try { await axios.post(url('/membership/payments'), { notes: 'Pago notificado desde la aplicación móvil.' }); showNotice('Pago notificado al administrador.'); } catch (e) { Alert.alert('Error', errorText(e, 'No se pudo notificar.')); } };
 
   const isAdmin = me?.role === 'ADMIN';
   const isTeacher = me?.role === 'TEACHER';
@@ -660,8 +663,6 @@ export default function DashboardScreen({ navigation }) {
     const details = [targetUser.email, targetUser.phone].filter(Boolean).join('\n');
     Alert.alert(targetUser.name || 'Usuario', details || 'Sin datos de contacto visibles.');
   };
-
-  const MenuSheet = () => <Sheet insets={insets} bottomInset={bottomInset} visible={menuOpen} title="Menú" compact onClose={() => setMenuOpen(false)}>{currentTabs.map(([id, label]) => <TouchableOpacity key={id} onPress={() => openTab(id)} style={[styles.menuItem, tab === id && styles.menuItemActive]}><Text style={[styles.menuText, tab === id && styles.menuTextActive]}>{label}{id === 'payments' && unread ? ` (${unread})` : ''}</Text></TouchableOpacity>)}</Sheet>;
 
   const resetActivityFilters = () => {
     setTypeFilter('all');
@@ -927,7 +928,7 @@ export default function DashboardScreen({ navigation }) {
       ) : null}
       {loading ? (
         <View style={styles.activitiesLoading} accessibilityLiveRegion="polite">
-          <ActivityIndicator size="small" color={COLORS.gold} />
+          <ActivityIndicator size="small" color={COLORS.accent} />
           <Text style={styles.activitiesLoadingText}>Cargando actividades...</Text>
         </View>
       ) : loadError && classes.length === 0 ? null : shownClasses.length ? (
@@ -988,7 +989,7 @@ export default function DashboardScreen({ navigation }) {
     return ClassesTab();
   };
 
-  if (loading && !me) return <SafeAreaView style={styles.center} edges={['top', 'bottom', 'left', 'right']}><ActivityIndicator size="large" color={COLORS.gold} /><Text style={styles.muted}>Cargando...</Text></SafeAreaView>;
+  if (loading && !me) return <SafeAreaView style={styles.center} edges={['top', 'bottom', 'left', 'right']}><ActivityIndicator size="large" color={COLORS.accent} /><Text style={styles.muted}>Cargando...</Text></SafeAreaView>;
   const appName = settings?.app_name || settings?.appName || 'Ronquillo Te Cuida';
   const syncLabel = syncStatus === 'connected' ? 'En directo' : syncStatus === 'connecting' ? 'Conectando' : 'Desconectado';
   const screenTitle = tab === 'classes' ? 'Actividades' : activeTabLabel;
@@ -1003,32 +1004,16 @@ export default function DashboardScreen({ navigation }) {
             {ROLES[me?.role] || me?.role} · {syncLabel}{isClient ? ` · cuota ${fmtDate(expiryOf(me))}` : ''}
           </Text>
         </View>
-        {currentTabs.length > 1 ? (
-          <TouchableOpacity accessibilityRole="button" onPress={() => setMenuOpen(true)} style={styles.manageButton}>
-            <Text style={styles.manageButtonText}>Gestionar{tab === 'payments' && unread ? ` ${unread}` : ''}</Text>
-          </TouchableOpacity>
-        ) : null}
         <TouchableOpacity accessibilityRole="button" onPress={logout} style={styles.logout}>
           <Text style={styles.logoutText}>Salir</Text>
         </TouchableOpacity>
       </View>
-      {tab !== 'classes' ? (
-        <View style={styles.compactMenu}>
-          <TouchableOpacity accessibilityRole="button" onPress={() => setMenuOpen(true)} style={styles.menuButton}>
-            <Text style={styles.menuButtonText}>Cambiar sección</Text>
-          </TouchableOpacity>
-          <TouchableOpacity accessibilityRole="button" onPress={refresh} style={styles.refreshButton}>
-            <Text style={styles.refreshText}>{refreshing ? 'Actualizando' : 'Actualizar'}</Text>
-          </TouchableOpacity>
-        </View>
-      ) : null}
-      {MenuSheet()}
       <ScrollView
         style={styles.content}
         contentContainerStyle={[styles.inner, { paddingBottom: 118 }]}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={COLORS.gold} colors={[COLORS.gold]} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={COLORS.accent} colors={[COLORS.accent]} />}
       >
         {Body()}
         <View style={styles.dashboardFooter}>
@@ -1058,14 +1043,12 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#09090b' }, center: { flex: 1, backgroundColor: '#09090b', alignItems: 'center', justifyContent: 'center', gap: 12 },
   activitiesTop: { minHeight: 104, paddingTop: 10, paddingHorizontal: 20, paddingBottom: 12, backgroundColor: '#09090b', flexDirection: 'row', alignItems: 'center', gap: 8 },
   activitiesIdentity: { flex: 1, minWidth: 0 },
-  activitiesEyebrow: { color: '#f4a621', fontSize: 10, lineHeight: 14, fontWeight: '900', letterSpacing: 1.2, textTransform: 'uppercase' },
+  activitiesEyebrow: { color: '#ff5a47', fontSize: 10, lineHeight: 14, fontWeight: '900', letterSpacing: 1.2, textTransform: 'uppercase' },
   activitiesTitle: { color: '#f7f7f8', fontSize: 30, lineHeight: 35, fontWeight: '900', letterSpacing: -0.5 },
   activitiesRole: { color: '#85858a', fontSize: 11, lineHeight: 16, fontWeight: '700', marginTop: 2 },
-  manageButton: { minHeight: 44, borderRadius: 22, backgroundColor: '#242424', justifyContent: 'center', paddingHorizontal: 13 },
-  manageButtonText: { color: '#e7e7e9', fontSize: 12, fontWeight: '900' },
   logout: { minHeight: 44, borderRadius: 22, backgroundColor: '#2a191b', justifyContent: 'center', paddingHorizontal: 14 },
   logoutText: { color: '#ff7566', fontWeight: '900', fontSize: 12 },
-  tabs: { paddingHorizontal: 14, paddingVertical: 12, gap: 8 }, tab: { backgroundColor: '#1c1c1f', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10 }, tabOn: { backgroundColor: '#f4a621' }, tabText: { color: '#a1a1aa', fontWeight: '900' }, tabTextOn: { color: '#19120a' },
+  tabs: { paddingHorizontal: 14, paddingVertical: 12, gap: 8 }, tab: { backgroundColor: '#1c1c1f', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10 }, tabOn: { backgroundColor: '#ff5a47' }, tabText: { color: '#a1a1aa', fontWeight: '900' }, tabTextOn: { color: '#ffffff' },
   content: { flex: 1 }, inner: { paddingHorizontal: 20, paddingTop: 4 },
   card: { backgroundColor: '#1c1c1f', borderRadius: 18, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }, smallCard: { backgroundColor: '#1c1c1f', borderRadius: 16, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }, classCard: { backgroundColor: '#1c1c1f', borderRadius: 18, padding: 15, marginBottom: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
   title: { color: '#fff', fontSize: 18, fontWeight: '900', marginBottom: 12 }, section: { color: '#fff', fontSize: 19, fontWeight: '900', marginVertical: 14 }, classTitle: { color: '#fff', fontSize: 17, fontWeight: '900' }, subtitle: { color: '#e4e4e7', fontSize: 12, fontWeight: '900', textTransform: 'uppercase', marginBottom: 8 }, text: { color: '#d4d4d8', fontSize: 14, lineHeight: 20 }, muted: { color: '#a1a1aa', fontSize: 12, lineHeight: 18 }, empty: { color: '#a1a1aa', textAlign: 'center', padding: 18 }, dashboardFooter: { alignItems: 'center', marginTop: 22, marginBottom: 4 }, dashboardCopyright: { color: '#71717a', fontSize: 11, fontWeight: '700', textAlign: 'center' }, dashboardPrivacyLink: { color: '#a1a1aa', fontSize: 11, fontWeight: '800', marginTop: 5, textAlign: 'center', textDecorationLine: 'underline' },
@@ -1080,22 +1063,17 @@ const styles = StyleSheet.create({
   preferenceInset: { marginTop: 14, paddingTop: 13, borderTopWidth: 1, borderTopColor: '#34343a' },
   fixedClientList: { gap: 8, marginBottom: 12 },
   fixedClient: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 13, padding: 10, backgroundColor: '#121214', borderWidth: 1, borderColor: '#34343a' },
-  fixedClientSelected: { backgroundColor: '#2a2112', borderColor: '#f4a621' },
+  fixedClientSelected: { backgroundColor: '#2a2112', borderColor: '#ff5a47' },
   selectionMark: { width: 24, height: 24, borderRadius: 7, borderWidth: 2, borderColor: '#71717a', alignItems: 'center', justifyContent: 'center' },
-  selectionMarkSelected: { backgroundColor: '#f4a621', borderColor: '#f4a621' },
+  selectionMarkSelected: { backgroundColor: '#ff5a47', borderColor: '#ff5a47' },
   selectionMarkText: { color: '#fff', fontSize: 15, lineHeight: 18, fontWeight: '900' },
   infoGrid: { flexDirection: 'row', gap: 8, marginTop: 12 },
   infoBox: { flex: 1, backgroundColor: '#121214', borderWidth: 1, borderColor: '#34343a', borderRadius: 14, padding: 12 },
-  btn: { minHeight: 46, backgroundColor: '#f4a621', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 23, alignItems: 'center', justifyContent: 'center', flexGrow: 1 }, btnText: { color: '#fff', fontWeight: '900', fontSize: 13 }, btn_blue: { backgroundColor: '#f4a621' }, btn_red: { backgroundColor: '#8d3040' }, btn_green: { backgroundColor: '#168a62' }, btn_yellow: { backgroundColor: '#f5c44d' }, btn_gray: { backgroundColor: '#303034' }, btn_coral: { backgroundColor: '#ff5a47' }, btn_light: { backgroundColor: '#f5f5f6' }, disabled: { opacity: 0.55 }, dark: { color: '#121214' },
-  chips: { gap: 8, marginBottom: 10 }, chip: { minHeight: 44, backgroundColor: '#121214', borderWidth: 1, borderColor: '#34343a', borderRadius: 999, paddingHorizontal: 12, justifyContent: 'center' }, chipText: { color: '#ffc65c', fontWeight: '900', fontSize: 12 },
+  btn: { minHeight: 46, backgroundColor: '#ff5a47', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 23, alignItems: 'center', justifyContent: 'center', flexGrow: 1 }, btnText: { color: '#fff', fontWeight: '900', fontSize: 13 }, btn_blue: { backgroundColor: '#ff5a47' }, btn_red: { backgroundColor: '#8d3040' }, btn_green: { backgroundColor: '#168a62' }, btn_yellow: { backgroundColor: '#f5c44d' }, btn_gray: { backgroundColor: '#303034' }, btn_coral: { backgroundColor: '#ff5a47' }, btn_light: { backgroundColor: '#f5f5f6' }, disabled: { opacity: 0.55 }, dark: { color: '#121214' },
+  chips: { gap: 8, marginBottom: 10 }, chip: { minHeight: 44, backgroundColor: '#121214', borderWidth: 1, borderColor: '#34343a', borderRadius: 999, paddingHorizontal: 12, justifyContent: 'center' }, chipText: { color: '#ff8a7d', fontWeight: '900', fontSize: 12 },
   header: { flexDirection: 'row', gap: 10, justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }, badge: { backgroundColor: '#121214', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: '#34343a' }, badgeText: { color: '#10b981', fontWeight: '900' }, classImage: { width: '100%', height: 145, borderRadius: 14, marginBottom: 10, backgroundColor: '#121214' },
-  box: { marginTop: 12, padding: 12, borderRadius: 14, backgroundColor: '#121214', borderWidth: 1, borderColor: '#34343a' }, student: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' }, avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#f4a621', alignItems: 'center', justifyContent: 'center' }, avatarAnonymous: { backgroundColor: '#52525b' }, avatarText: { color: '#19120a', fontWeight: '900' }, userImg: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#f4a621', alignItems: 'center', justifyContent: 'center' },
+  box: { marginTop: 12, padding: 12, borderRadius: 14, backgroundColor: '#121214', borderWidth: 1, borderColor: '#34343a' }, student: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' }, avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#ff5a47', alignItems: 'center', justifyContent: 'center' }, avatarAnonymous: { backgroundColor: '#52525b' }, avatarText: { color: '#19120a', fontWeight: '900' }, userImg: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#ff5a47', alignItems: 'center', justifyContent: 'center' },
 
-  compactMenu: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, paddingVertical: 8, backgroundColor: '#09090b', borderBottomWidth: 1, borderBottomColor: '#242424' },
-  menuButton: { flex: 1, backgroundColor: '#1c1c1f', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: '#34343a' },
-  menuButtonText: { color: '#fff', fontWeight: '900' },
-  refreshButton: { backgroundColor: '#34343a', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, alignItems: 'center', justifyContent: 'center' },
-  refreshText: { color: '#ffc65c', fontWeight: '900', fontSize: 12 },
   actionBar: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'flex-end', paddingHorizontal: 10 },
   backdropPressable: { ...StyleSheet.absoluteFillObject },
@@ -1107,15 +1085,11 @@ const styles = StyleSheet.create({
   closeButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#1c1c1f', alignItems: 'center', justifyContent: 'center' },
   closeText: { color: '#fff', fontWeight: '900', fontSize: 16 },
   sheetBody: { padding: 14 },
-  menuItem: { backgroundColor: '#1c1c1f', borderRadius: 14, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
-  menuItemActive: { backgroundColor: '#f4a621', borderColor: '#ffc65c' },
-  menuText: { color: '#d4d4d8', fontWeight: '900' },
-  menuTextActive: { color: '#19120a' },
   notice: { position: 'absolute', left: 16, right: 16, backgroundColor: '#059669', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 14, elevation: 8 },
   noticeError: { backgroundColor: '#dc2626' },
   noticeText: { color: '#fff', fontWeight: '900', textAlign: 'center' },
-  tapHint: { color: '#ffc65c', fontSize: 12, fontWeight: '900', marginTop: 8 },
-  pill: { alignSelf: 'flex-start', color: '#19120a', backgroundColor: '#f4a621', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, marginTop: 8, overflow: 'hidden', fontWeight: '900', fontSize: 12 }, warning: { backgroundColor: 'rgba(217,119,6,0.16)', borderWidth: 1, borderColor: 'rgba(251,191,36,0.35)', borderRadius: 14, padding: 14, marginBottom: 14 }, warnTitle: { color: '#fbbf24', fontWeight: '900', marginBottom: 4 }, unread: { borderColor: '#f4a621', backgroundColor: 'rgba(244,166,33,0.12)' }, metric: { backgroundColor: 'rgba(16,185,129,0.12)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.25)', borderRadius: 16, padding: 14, marginBottom: 10 },
+  tapHint: { color: '#ff8a7d', fontSize: 12, fontWeight: '900', marginTop: 8 },
+  pill: { alignSelf: 'flex-start', color: '#19120a', backgroundColor: '#ff5a47', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, marginTop: 8, overflow: 'hidden', fontWeight: '900', fontSize: 12 }, warning: { backgroundColor: 'rgba(217,119,6,0.16)', borderWidth: 1, borderColor: 'rgba(251,191,36,0.35)', borderRadius: 14, padding: 14, marginBottom: 14 }, warnTitle: { color: '#fbbf24', fontWeight: '900', marginBottom: 4 }, unread: { borderColor: '#ff5a47', backgroundColor: 'rgba(255,90,71,0.12)' }, metric: { backgroundColor: 'rgba(16,185,129,0.12)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.25)', borderRadius: 16, padding: 14, marginBottom: 10 },
   activityActions: { flexDirection: 'row', gap: 8, marginTop: 14, marginBottom: 16 },
   filterLabel: { color: '#f4f4f5', fontSize: 13, fontWeight: '900', textTransform: 'uppercase', marginBottom: 8 },
   filterOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 },
@@ -1123,7 +1097,7 @@ const styles = StyleSheet.create({
   activitiesLoadingText: { color: '#9a9a9f', fontSize: 14, fontWeight: '700' },
   typeImageTypes: { gap: 10, paddingBottom: 14 },
   typeImageType: { width: 132, minHeight: 116, backgroundColor: '#101820', borderWidth: 2, borderColor: '#34343a', borderRadius: 14, padding: 8 },
-  typeImageTypeActive: { borderColor: '#f4a621', backgroundColor: '#2a2112' },
+  typeImageTypeActive: { borderColor: '#ff5a47', backgroundColor: '#2a2112' },
   typeImageThumb: { width: '100%', height: 68, borderRadius: 9, backgroundColor: '#09090b' },
   typeImageThumbEmpty: { width: '100%', height: 68, borderRadius: 9, backgroundColor: '#09090b', alignItems: 'center', justifyContent: 'center' },
   typeImageThumbText: { color: '#71717a', fontSize: 11, fontWeight: '800' },

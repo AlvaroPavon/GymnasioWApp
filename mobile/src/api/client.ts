@@ -10,6 +10,6 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
     }
   });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error?.message ?? "API request failed");
+  if (!response.ok) throw new Error(data.error?.message ?? "La solicitud a la API no se pudo completar.");
   return data as T;
 }

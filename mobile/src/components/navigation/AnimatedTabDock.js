@@ -20,35 +20,59 @@ const ICONS = {
 };
 
 function DockItem({ id, label, active, badge, onPress, reduceMotion }) {
-  const scale = useRef(new Animated.Value(active ? 1 : 0.94)).current;
+  const activeProgress = useRef(new Animated.Value(active ? 1 : 0)).current;
+  const pressScale = useRef(new Animated.Value(1)).current;
   const Icon = ICONS[id] || CalendarDots;
 
   useEffect(() => {
     if (reduceMotion) {
-      scale.stopAnimation();
-      scale.setValue(active ? 1 : 0.94);
+      activeProgress.stopAnimation();
+      activeProgress.setValue(active ? 1 : 0);
       return undefined;
     }
-    Animated.spring(scale, {
-      toValue: active ? 1 : 0.94,
-      damping: 16,
-      stiffness: 210,
+    Animated.spring(activeProgress, {
+      toValue: active ? 1 : 0,
+      damping: 17,
+      stiffness: 230,
+      mass: 0.75,
       useNativeDriver: true
     }).start();
-    return () => scale.stopAnimation();
-  }, [active, reduceMotion, scale]);
+    return () => activeProgress.stopAnimation();
+  }, [active, activeProgress, reduceMotion]);
+
+  const animatePress = (toValue) => {
+    if (reduceMotion) {
+      pressScale.setValue(toValue);
+      return;
+    }
+    Animated.spring(pressScale, {
+      toValue,
+      damping: 16,
+      stiffness: 360,
+      useNativeDriver: true
+    }).start();
+  };
+
+  const scale = Animated.multiply(
+    activeProgress.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] }),
+    pressScale
+  );
+  const translateY = activeProgress.interpolate({ inputRange: [0, 1], outputRange: [0, -3] });
 
   return (
-    <Animated.View style={{ transform: [{ scale }] }}>
+    <Animated.View style={{ transform: [{ translateY }, { scale }] }}>
       <Pressable
         accessibilityRole="tab"
         accessibilityState={{ selected: active }}
-        accessibilityLabel={label}
+        accessibilityLabel={badge ? `${label}, ${badge} ${badge === 1 ? 'aviso pendiente' : 'avisos pendientes'}` : label}
         onPress={onPress}
-        style={({ pressed }) => [styles.item, active && styles.itemActive, pressed && styles.itemPressed]}
+        onPressIn={() => animatePress(0.92)}
+        onPressOut={() => animatePress(1)}
+        style={styles.item}
       >
+        <Animated.View pointerEvents="none" style={[styles.activePill, { opacity: activeProgress }]} />
         <View>
-          <Icon size={21} color={active ? '#19120a' : COLORS.textSecondary} weight={active ? 'fill' : 'duotone'} />
+          <Icon size={21} color={active ? '#111216' : COLORS.textSecondary} weight={active ? 'fill' : 'duotone'} />
           {badge ? <View style={styles.badge}><Text style={styles.badgeText}>{badge > 9 ? '9+' : badge}</Text></View> : null}
         </View>
         <Text numberOfLines={1} style={[styles.label, active && styles.labelActive]}>{label}</Text>
@@ -116,11 +140,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden'
   },
   content: { minWidth: '100%', flexGrow: 1, alignItems: 'center', justifyContent: 'space-around', paddingHorizontal: 6, paddingVertical: 6, gap: 1 },
-  item: { minWidth: 51, minHeight: 56, borderRadius: 22, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center', gap: 3 },
-  itemActive: { backgroundColor: COLORS.gold },
-  itemPressed: { opacity: 0.72 },
-  label: { maxWidth: 54, color: COLORS.textMuted, fontSize: 9, lineHeight: 12, fontWeight: '900', textAlign: 'center' },
-  labelActive: { color: '#19120a' },
+  item: { minWidth: 51, minHeight: 56, borderRadius: 22, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center', gap: 3, overflow: 'hidden' },
+  activePill: { ...StyleSheet.absoluteFillObject, borderRadius: 22, backgroundColor: COLORS.accent, shadowColor: COLORS.accent, shadowOpacity: 0.36, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 5 },
+  label: { maxWidth: 54, color: COLORS.textSecondary, fontSize: 9, lineHeight: 12, fontWeight: '900', textAlign: 'center' },
+  labelActive: { color: '#111216' },
   badge: { position: 'absolute', right: -8, top: -6, minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 3, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.danger },
   badgeText: { color: '#fff', fontSize: 8, lineHeight: 10, fontWeight: '900' }
 });

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
   clearSessionState,
@@ -26,6 +27,11 @@ function createHttpClient(get) {
     get
   };
 }
+
+test("the active dashboard role reset does not call the removed menu state", async () => {
+  const source = await readFile(new URL("../src/screens/DashboardScreen.js", import.meta.url), "utf8");
+  assert.doesNotMatch(source, /setMenuOpen\s*\(/);
+});
 
 test("replaces a cached role with the authoritative current role", async () => {
   const storage = createStorage({

@@ -35,11 +35,13 @@ import { COLORS, RADII } from "../src/theme";
 const brandLogo = require("../assets/logo.jpg");
 const COPYRIGHT_TEXT = "Creada por Álvaro Pavón. Derechos reservados.";
 
-const getApiErrorMessage = (error, fallback) =>
-  error?.response?.data?.error?.message ||
-  error?.response?.data?.message ||
-  error?.message ||
-  fallback;
+const getApiErrorMessage = (error, fallback) => {
+  const apiMessage = error?.response?.data?.error?.message || error?.response?.data?.message;
+  if (apiMessage) return apiMessage;
+  if (error?.code === "ECONNABORTED") return "La solicitud tardó demasiado. Inténtalo de nuevo.";
+  if (error?.isAxiosError || error?.code === "ERR_NETWORK") return "No se pudo conectar con el servidor. Revisa tu conexión.";
+  return fallback;
+};
 
 const normalizeEmail = (value) => value.trim().toLowerCase();
 
@@ -208,7 +210,7 @@ export default function LoginScreen({ navigation }) {
         rememberMe
       });
       if (session.status !== "authenticated") {
-        throw new Error("No se pudo validar la sesión.");
+        throw new Error("SESSION_VALIDATION_FAILED");
       }
       if (classReminderEnabled(session.user)) {
         await registerPushToken(token);
@@ -225,7 +227,7 @@ export default function LoginScreen({ navigation }) {
   if (checkingSession) {
     return (
       <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
-        <ActivityIndicator size="large" color={COLORS.gold} />
+        <ActivityIndicator size="large" color={COLORS.accent} />
         <Text style={styles.loadingText}>Comprobando sesión...</Text>
       </SafeAreaView>
     );
@@ -260,7 +262,7 @@ export default function LoginScreen({ navigation }) {
 
             <Text style={styles.inputLabel}>EMAIL</Text>
             <View style={[styles.inputShell, keyboardCompact && styles.inputShellKeyboard]}>
-              <EnvelopeSimple size={20} color={COLORS.gold} weight="bold" />
+              <EnvelopeSimple size={20} color={COLORS.accent} weight="bold" />
               <TextInput
                 style={styles.input}
                 placeholder="tu@email.com"
@@ -282,7 +284,7 @@ export default function LoginScreen({ navigation }) {
 
             <Text style={styles.inputLabel}>CONTRASEÑA</Text>
             <View style={[styles.inputShell, keyboardCompact && styles.inputShellKeyboard]}>
-              <LockKey size={20} color={COLORS.gold} weight="bold" />
+              <LockKey size={20} color={COLORS.accent} weight="bold" />
               <TextInput
                 ref={passwordInputRef}
                 style={styles.input}
@@ -318,7 +320,7 @@ export default function LoginScreen({ navigation }) {
               <Switch
                 value={rememberMe}
                 onValueChange={setRememberMe}
-                trackColor={{ false: COLORS.elevated, true: COLORS.gold }}
+                trackColor={{ false: COLORS.elevated, true: COLORS.accent }}
                 thumbColor={rememberMe ? "#fff7e6" : COLORS.textSecondary}
               />
             </View>
@@ -384,7 +386,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffffff"
   },
   logoKeyboard: { borderRadius: RADII.small },
-  eyebrow: { color: COLORS.gold, fontSize: 10, lineHeight: 14, fontWeight: "900", letterSpacing: 1.8, marginBottom: 4 },
+  eyebrow: { color: COLORS.accent, fontSize: 10, lineHeight: 14, fontWeight: "900", letterSpacing: 1.8, marginBottom: 4 },
   title: {
     fontSize: 29,
     lineHeight: 34,
@@ -429,7 +431,7 @@ const styles = StyleSheet.create({
   rememberText: { color: COLORS.textSecondary, fontSize: 12, fontWeight: "800", flex: 1, paddingRight: 12 },
   button: {
     minHeight: 54,
-    backgroundColor: COLORS.gold,
+    backgroundColor: COLORS.accent,
     paddingHorizontal: 18,
     borderRadius: RADII.medium,
     alignItems: "center",
@@ -437,7 +439,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
     marginTop: 12,
-    shadowColor: COLORS.gold,
+    shadowColor: COLORS.accent,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.24,
     shadowRadius: 14,

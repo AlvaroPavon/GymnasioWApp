@@ -13,11 +13,17 @@ export default function BrandSplash({ onFinished }) {
   useEffect(() => {
     let active = true;
     let animation;
+    let finishTimer;
 
     AccessibilityInfo.isReduceMotionEnabled().then((reduceMotion) => {
       if (!active) return;
       if (reduceMotion) {
-        onFinished?.();
+        logoScale.setValue(1);
+        logoOpacity.setValue(1);
+        copyOffset.setValue(0);
+        finishTimer = setTimeout(() => {
+          if (active) onFinished?.();
+        }, 500);
         return;
       }
 
@@ -60,6 +66,7 @@ export default function BrandSplash({ onFinished }) {
     return () => {
       active = false;
       animation?.stop();
+      if (finishTimer) clearTimeout(finishTimer);
     };
   }, [copyOffset, logoOpacity, logoScale, onFinished, opacity]);
 
@@ -114,7 +121,7 @@ const styles = StyleSheet.create({
   },
   logo: { width: '100%', height: '100%', borderRadius: RADII.large },
   title: { color: COLORS.text, fontSize: 29, lineHeight: 34, fontWeight: '900', letterSpacing: 2.2, textAlign: 'center', marginTop: 27 },
-  subtitle: { color: COLORS.gold, fontSize: 13, lineHeight: 18, fontWeight: '900', letterSpacing: 6, textAlign: 'center', marginTop: 2 },
+  subtitle: { color: COLORS.accent, fontSize: 13, lineHeight: 18, fontWeight: '900', letterSpacing: 6, textAlign: 'center', marginTop: 2 },
   progressTrack: { width: 82, height: 3, borderRadius: 2, backgroundColor: COLORS.elevated, overflow: 'hidden', marginTop: 28 },
-  progress: { width: '72%', height: '100%', alignSelf: 'center', borderRadius: 2, backgroundColor: COLORS.gold }
+  progress: { width: '72%', height: '100%', alignSelf: 'center', borderRadius: 2, backgroundColor: COLORS.accent }
 });

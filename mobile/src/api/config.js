@@ -14,7 +14,7 @@ export function getApiOrigin() {
 export function getApiBaseUrl() {
   const origin = getApiOrigin();
   if (!origin) {
-    throw new Error("EXPO_PUBLIC_API_URL is required for production mobile builds.");
+    throw new Error("EXPO_PUBLIC_API_URL es obligatoria en las compilaciones móviles de producción.");
   }
   return `${origin}/api`;
 }

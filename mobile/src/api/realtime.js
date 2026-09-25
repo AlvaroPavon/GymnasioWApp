@@ -3,7 +3,7 @@ import { getApiOrigin } from "./config";
 export const toRealtimeUrl = () => {
   const origin = getApiOrigin();
   if (!origin) {
-    throw new Error("EXPO_PUBLIC_API_URL is required for realtime sync.");
+    throw new Error("EXPO_PUBLIC_API_URL es obligatoria para la sincronización en tiempo real.");
   }
 
   const websocketOrigin = origin.startsWith("https://")

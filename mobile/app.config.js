@@ -1,7 +1,7 @@
 const appName = process.env.APP_NAME ?? "Ronquillo Te Cuida";
 const appSlug = process.env.APP_SLUG ?? "ronquillotecuida";
 const appScheme = process.env.APP_SCHEME ?? "ronquillotecuida";
-const appVersion = process.env.APP_VERSION ?? "1.0.2";
+const appVersion = process.env.APP_VERSION ?? "1.0.3";
 const iosBundleIdentifier =
   process.env.IOS_BUNDLE_IDENTIFIER ?? "com.azrael.ronquillotecuida";
 const androidPackage = process.env.ANDROID_PACKAGE ?? "com.azrael.ronquillotecuida";
@@ -11,13 +11,13 @@ module.exports = {
     name: appName,
     slug: appSlug,
     version: appVersion,
-    orientation: "portrait",
     scheme: appScheme,
     userInterfaceStyle: "dark",
     newArchEnabled: true,
     icon: "./assets/icon.png",
     ios: {
-      supportsTablet: false,
+      supportsTablet: true,
+      requireFullScreen: false,
       bundleIdentifier: iosBundleIdentifier,
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false
@@ -36,16 +36,26 @@ module.exports = {
         "expo-splash-screen",
         {
           backgroundColor: "#09090b",
-          image: "./assets/splash-transparent.png",
-          imageWidth: 1
+          image: "./assets/icon.png",
+          imageWidth: 220,
+          resizeMode: "contain"
         }
       ],
       [
         "expo-notifications",
         {
           icon: "./assets/notification-icon.png",
-          color: "#f4a621",
+          color: "#ff5a47",
           defaultChannel: "default"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          android: {
+            enableMinifyInReleaseBuilds: true,
+            enableShrinkResourcesInReleaseBuilds: true
+          }
         }
       ],
       [
