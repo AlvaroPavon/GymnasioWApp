@@ -38,7 +38,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:-local_docker_only_replace_with_32_chars_minimum}
       JWT_EXPIRES_IN: 8h
       BCRYPT_COST: 12
-      CORS_ORIGIN: http://localhost:5173
+      CORS_ORIGIN: http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174
       PUBLIC_BASE_URL: http://localhost:3000
       CRON_ENABLED: "true"
     ports:
@@ -60,6 +60,12 @@ services:
     volumes:
       - .:/workspace
       - api_node_modules:/workspace/node_modules
+      # Keep Linux workspace dependencies isolated from host-side Windows
+      # node_modules folders. Without these mounts native packages such as
+      # sharp can resolve the Windows installation inside the container.
+      - api_workspace_node_modules:/workspace/api/node_modules
+      - web_workspace_node_modules:/workspace/web/node_modules
+      - mobile_workspace_node_modules:/workspace/mobile/node_modules
       - api_prisma_generated:/workspace/api/src/generated/prisma
       - api_uploads:/workspace/api/uploads
       - ./api/uploads/class-types:/bundled-class-types:ro
@@ -73,4 +79,7 @@ volumes:
   mysql_data:
   api_uploads:
   api_node_modules:
+  api_workspace_node_modules:
+  web_workspace_node_modules:
+  mobile_workspace_node_modules:
   api_prisma_generated:
