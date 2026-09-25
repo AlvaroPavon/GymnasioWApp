@@ -56,6 +56,8 @@ import {
   ActivitySiteRow,
   ActivityWeekStrip
 } from '../components/activities/ActivityCalendar';
+import AnimatedTabDock from '../components/navigation/AnimatedTabDock';
+import { COLORS } from '../theme';
 
 const COPYRIGHT_TEXT = 'Creada por Álvaro Pavón. Derechos reservados.';
 
@@ -81,7 +83,7 @@ function Input({ label, value, onChangeText, keyboardType, secureTextEntry, mult
       <TextInput
         style={[styles.input, multiline && styles.area]}
         placeholder={placeholder || label}
-        placeholderTextColor="#64748b"
+        placeholderTextColor="#71717a"
         value={value}
         onChangeText={onChangeText}
         keyboardType={keyboardType}
@@ -96,14 +98,14 @@ function Input({ label, value, onChangeText, keyboardType, secureTextEntry, mult
   );
 }
 function Btn({ title, onPress, tone = 'blue', disabled }) {
-  return <TouchableOpacity accessibilityRole="button" accessibilityState={{ disabled: !!disabled }} disabled={disabled} onPress={onPress} style={[styles.btn, styles[`btn_${tone}`], disabled && styles.disabled]}><Text style={[styles.btnText, (tone === 'yellow' || tone === 'light') && styles.dark]}>{title}</Text></TouchableOpacity>;
+  return <TouchableOpacity accessibilityRole="button" accessibilityState={{ disabled: !!disabled }} disabled={disabled} onPress={onPress} style={[styles.btn, styles[`btn_${tone}`], disabled && styles.disabled]}><Text style={[styles.btnText, (tone === 'blue' || tone === 'yellow' || tone === 'light') && styles.dark]}>{title}</Text></TouchableOpacity>;
 }
 function Chip({ text, onPress }) {
   return <TouchableOpacity accessibilityRole="button" onPress={onPress} style={styles.chip}><Text style={styles.chipText}>{text}</Text></TouchableOpacity>;
 }
 
 function PreferenceToggle({ label, description, value, onValueChange, disabled = false }) {
-  return <View style={styles.preferenceRow}><View style={styles.preferenceCopy}><Text style={styles.preferenceLabel}>{label}</Text><Text style={styles.preferenceDescription}>{description}</Text></View><Switch accessibilityLabel={label} disabled={disabled} value={!!value} onValueChange={onValueChange} trackColor={{ false: '#475569', true: '#ff806f' }} thumbColor={value ? '#fff' : '#cbd5e1'} /></View>;
+  return <View style={styles.preferenceRow}><View style={styles.preferenceCopy}><Text style={styles.preferenceLabel}>{label}</Text><Text style={styles.preferenceDescription}>{description}</Text></View><Switch accessibilityLabel={label} disabled={disabled} value={!!value} onValueChange={onValueChange} trackColor={{ false: '#3f3f46', true: COLORS.gold }} thumbColor={value ? '#fff7e6' : '#d4d4d8'} /></View>;
 }
 
 function Sheet({ visible, title, onClose, children, compact = false, insets, bottomInset }) {
@@ -925,7 +927,7 @@ export default function DashboardScreen({ navigation }) {
       ) : null}
       {loading ? (
         <View style={styles.activitiesLoading} accessibilityLiveRegion="polite">
-          <ActivityIndicator size="small" color="#ff5a47" />
+          <ActivityIndicator size="small" color={COLORS.gold} />
           <Text style={styles.activitiesLoadingText}>Cargando actividades...</Text>
         </View>
       ) : loadError && classes.length === 0 ? null : shownClasses.length ? (
@@ -986,7 +988,7 @@ export default function DashboardScreen({ navigation }) {
     return ClassesTab();
   };
 
-  if (loading && !me) return <SafeAreaView style={styles.center} edges={['top', 'bottom', 'left', 'right']}><ActivityIndicator size="large" color="#60a5fa" /><Text style={styles.muted}>Cargando...</Text></SafeAreaView>;
+  if (loading && !me) return <SafeAreaView style={styles.center} edges={['top', 'bottom', 'left', 'right']}><ActivityIndicator size="large" color={COLORS.gold} /><Text style={styles.muted}>Cargando...</Text></SafeAreaView>;
   const appName = settings?.app_name || settings?.appName || 'Ronquillo Te Cuida';
   const syncLabel = syncStatus === 'connected' ? 'En directo' : syncStatus === 'connecting' ? 'Conectando' : 'Desconectado';
   const screenTitle = tab === 'classes' ? 'Actividades' : activeTabLabel;
@@ -1023,10 +1025,10 @@ export default function DashboardScreen({ navigation }) {
       {MenuSheet()}
       <ScrollView
         style={styles.content}
-        contentContainerStyle={[styles.inner, { paddingBottom: 34 }]}
+        contentContainerStyle={[styles.inner, { paddingBottom: 118 }]}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor="#ff5a47" colors={['#ff5a47']} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={COLORS.gold} colors={[COLORS.gold]} />}
       >
         {Body()}
         <View style={styles.dashboardFooter}>
@@ -1036,8 +1038,15 @@ export default function DashboardScreen({ navigation }) {
           </TouchableOpacity>
         </View>
       </ScrollView>
+      <AnimatedTabDock
+        tabs={currentTabs}
+        activeTab={tab}
+        unread={unread}
+        onChange={openTab}
+        bottomInset={bottomInset}
+      />
       {notice ? (
-        <View pointerEvents="none" style={[styles.notice, notice.tone === 'error' && styles.noticeError, { bottom: 10 }]}>
+        <View pointerEvents="none" style={[styles.notice, notice.tone === 'error' && styles.noticeError, { bottom: bottomInset + 78 }]}>
           <Text style={styles.noticeText}>{notice.message}</Text>
         </View>
       ) : null}
@@ -1046,84 +1055,84 @@ export default function DashboardScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#101010' }, center: { flex: 1, backgroundColor: '#101010', alignItems: 'center', justifyContent: 'center', gap: 12 },
-  activitiesTop: { minHeight: 104, paddingTop: 10, paddingHorizontal: 20, paddingBottom: 12, backgroundColor: '#101010', flexDirection: 'row', alignItems: 'center', gap: 8 },
+  container: { flex: 1, backgroundColor: '#09090b' }, center: { flex: 1, backgroundColor: '#09090b', alignItems: 'center', justifyContent: 'center', gap: 12 },
+  activitiesTop: { minHeight: 104, paddingTop: 10, paddingHorizontal: 20, paddingBottom: 12, backgroundColor: '#09090b', flexDirection: 'row', alignItems: 'center', gap: 8 },
   activitiesIdentity: { flex: 1, minWidth: 0 },
-  activitiesEyebrow: { color: '#ff6b5b', fontSize: 10, lineHeight: 14, fontWeight: '900', letterSpacing: 1.2, textTransform: 'uppercase' },
+  activitiesEyebrow: { color: '#f4a621', fontSize: 10, lineHeight: 14, fontWeight: '900', letterSpacing: 1.2, textTransform: 'uppercase' },
   activitiesTitle: { color: '#f7f7f8', fontSize: 30, lineHeight: 35, fontWeight: '900', letterSpacing: -0.5 },
   activitiesRole: { color: '#85858a', fontSize: 11, lineHeight: 16, fontWeight: '700', marginTop: 2 },
   manageButton: { minHeight: 44, borderRadius: 22, backgroundColor: '#242424', justifyContent: 'center', paddingHorizontal: 13 },
   manageButtonText: { color: '#e7e7e9', fontSize: 12, fontWeight: '900' },
   logout: { minHeight: 44, borderRadius: 22, backgroundColor: '#2a191b', justifyContent: 'center', paddingHorizontal: 14 },
   logoutText: { color: '#ff7566', fontWeight: '900', fontSize: 12 },
-  tabs: { paddingHorizontal: 14, paddingVertical: 12, gap: 8 }, tab: { backgroundColor: '#1e293b', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10 }, tabOn: { backgroundColor: '#2563eb' }, tabText: { color: '#94a3b8', fontWeight: '900' }, tabTextOn: { color: '#fff' },
+  tabs: { paddingHorizontal: 14, paddingVertical: 12, gap: 8 }, tab: { backgroundColor: '#1c1c1f', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10 }, tabOn: { backgroundColor: '#f4a621' }, tabText: { color: '#a1a1aa', fontWeight: '900' }, tabTextOn: { color: '#19120a' },
   content: { flex: 1 }, inner: { paddingHorizontal: 20, paddingTop: 4 },
-  card: { backgroundColor: '#1e293b', borderRadius: 18, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }, smallCard: { backgroundColor: '#1e293b', borderRadius: 16, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }, classCard: { backgroundColor: '#1e293b', borderRadius: 18, padding: 15, marginBottom: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
-  title: { color: '#fff', fontSize: 18, fontWeight: '900', marginBottom: 12 }, section: { color: '#fff', fontSize: 19, fontWeight: '900', marginVertical: 14 }, classTitle: { color: '#fff', fontSize: 17, fontWeight: '900' }, subtitle: { color: '#e2e8f0', fontSize: 12, fontWeight: '900', textTransform: 'uppercase', marginBottom: 8 }, text: { color: '#cbd5e1', fontSize: 14, lineHeight: 20 }, muted: { color: '#94a3b8', fontSize: 12, lineHeight: 18 }, empty: { color: '#94a3b8', textAlign: 'center', padding: 18 }, dashboardFooter: { alignItems: 'center', marginTop: 22, marginBottom: 4 }, dashboardCopyright: { color: '#64748b', fontSize: 11, fontWeight: '700', textAlign: 'center' }, dashboardPrivacyLink: { color: '#94a3b8', fontSize: 11, fontWeight: '800', marginTop: 5, textAlign: 'center', textDecorationLine: 'underline' },
-  field: { marginBottom: 11 }, label: { color: '#cbd5e1', fontSize: 12, fontWeight: '900', marginBottom: 6, textTransform: 'uppercase' }, input: { minHeight: 48, backgroundColor: '#0f172a', color: '#f8fafc', borderWidth: 1, borderColor: '#334155', borderRadius: 12, padding: 12, fontSize: 15 }, area: { minHeight: 82, textAlignVertical: 'top' }, fieldHint: { color: '#94a3b8', fontSize: 12, lineHeight: 18, marginTop: -3, marginBottom: 12 },
-  row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }, switchRow: { flexDirection: 'row', gap: 8, backgroundColor: '#020617', borderRadius: 14, padding: 4, marginBottom: 14 },
+  card: { backgroundColor: '#1c1c1f', borderRadius: 18, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }, smallCard: { backgroundColor: '#1c1c1f', borderRadius: 16, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }, classCard: { backgroundColor: '#1c1c1f', borderRadius: 18, padding: 15, marginBottom: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  title: { color: '#fff', fontSize: 18, fontWeight: '900', marginBottom: 12 }, section: { color: '#fff', fontSize: 19, fontWeight: '900', marginVertical: 14 }, classTitle: { color: '#fff', fontSize: 17, fontWeight: '900' }, subtitle: { color: '#e4e4e7', fontSize: 12, fontWeight: '900', textTransform: 'uppercase', marginBottom: 8 }, text: { color: '#d4d4d8', fontSize: 14, lineHeight: 20 }, muted: { color: '#a1a1aa', fontSize: 12, lineHeight: 18 }, empty: { color: '#a1a1aa', textAlign: 'center', padding: 18 }, dashboardFooter: { alignItems: 'center', marginTop: 22, marginBottom: 4 }, dashboardCopyright: { color: '#71717a', fontSize: 11, fontWeight: '700', textAlign: 'center' }, dashboardPrivacyLink: { color: '#a1a1aa', fontSize: 11, fontWeight: '800', marginTop: 5, textAlign: 'center', textDecorationLine: 'underline' },
+  field: { marginBottom: 11 }, label: { color: '#d4d4d8', fontSize: 12, fontWeight: '900', marginBottom: 6, textTransform: 'uppercase' }, input: { minHeight: 48, backgroundColor: '#121214', color: '#f8fafc', borderWidth: 1, borderColor: '#34343a', borderRadius: 12, padding: 12, fontSize: 15 }, area: { minHeight: 82, textAlignVertical: 'top' }, fieldHint: { color: '#a1a1aa', fontSize: 12, lineHeight: 18, marginTop: -3, marginBottom: 12 },
+  row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }, switchRow: { flexDirection: 'row', gap: 8, backgroundColor: '#09090b', borderRadius: 14, padding: 4, marginBottom: 14 },
   preferenceCard: { backgroundColor: '#1c1c1e', borderRadius: 18, padding: 14, marginTop: 14, marginBottom: 4, borderWidth: 1, borderColor: '#2f2f32' },
   preferenceRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   preferenceCopy: { flex: 1 },
   preferenceLabel: { color: '#f4f4f5', fontSize: 14, lineHeight: 19, fontWeight: '900' },
   preferenceDescription: { color: '#8f8f95', fontSize: 12, lineHeight: 17, marginTop: 3 },
   preferenceDivider: { height: 1, backgroundColor: '#323236', marginVertical: 13 },
-  preferenceInset: { marginTop: 14, paddingTop: 13, borderTopWidth: 1, borderTopColor: '#334155' },
+  preferenceInset: { marginTop: 14, paddingTop: 13, borderTopWidth: 1, borderTopColor: '#34343a' },
   fixedClientList: { gap: 8, marginBottom: 12 },
-  fixedClient: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 13, padding: 10, backgroundColor: '#0f172a', borderWidth: 1, borderColor: '#334155' },
-  fixedClientSelected: { backgroundColor: '#25213a', borderColor: '#ff806f' },
-  selectionMark: { width: 24, height: 24, borderRadius: 7, borderWidth: 2, borderColor: '#64748b', alignItems: 'center', justifyContent: 'center' },
-  selectionMarkSelected: { backgroundColor: '#ff5a47', borderColor: '#ff5a47' },
+  fixedClient: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 13, padding: 10, backgroundColor: '#121214', borderWidth: 1, borderColor: '#34343a' },
+  fixedClientSelected: { backgroundColor: '#2a2112', borderColor: '#f4a621' },
+  selectionMark: { width: 24, height: 24, borderRadius: 7, borderWidth: 2, borderColor: '#71717a', alignItems: 'center', justifyContent: 'center' },
+  selectionMarkSelected: { backgroundColor: '#f4a621', borderColor: '#f4a621' },
   selectionMarkText: { color: '#fff', fontSize: 15, lineHeight: 18, fontWeight: '900' },
   infoGrid: { flexDirection: 'row', gap: 8, marginTop: 12 },
-  infoBox: { flex: 1, backgroundColor: '#0f172a', borderWidth: 1, borderColor: '#334155', borderRadius: 14, padding: 12 },
-  btn: { minHeight: 46, backgroundColor: '#2563eb', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 23, alignItems: 'center', justifyContent: 'center', flexGrow: 1 }, btnText: { color: '#fff', fontWeight: '900', fontSize: 13 }, btn_blue: { backgroundColor: '#2563eb' }, btn_red: { backgroundColor: '#8d3040' }, btn_green: { backgroundColor: '#168a62' }, btn_yellow: { backgroundColor: '#f5c44d' }, btn_gray: { backgroundColor: '#303034' }, btn_coral: { backgroundColor: '#ff5a47' }, btn_light: { backgroundColor: '#f5f5f6' }, disabled: { opacity: 0.55 }, dark: { color: '#0f172a' },
-  chips: { gap: 8, marginBottom: 10 }, chip: { minHeight: 44, backgroundColor: '#0f172a', borderWidth: 1, borderColor: '#334155', borderRadius: 999, paddingHorizontal: 12, justifyContent: 'center' }, chipText: { color: '#bfdbfe', fontWeight: '900', fontSize: 12 },
-  header: { flexDirection: 'row', gap: 10, justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }, badge: { backgroundColor: '#0f172a', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: '#334155' }, badgeText: { color: '#10b981', fontWeight: '900' }, classImage: { width: '100%', height: 145, borderRadius: 14, marginBottom: 10, backgroundColor: '#0f172a' },
-  box: { marginTop: 12, padding: 12, borderRadius: 14, backgroundColor: '#0f172a', borderWidth: 1, borderColor: '#334155' }, student: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' }, avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#2563eb', alignItems: 'center', justifyContent: 'center' }, avatarAnonymous: { backgroundColor: '#475569' }, avatarText: { color: '#fff', fontWeight: '900' }, userImg: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#2563eb', alignItems: 'center', justifyContent: 'center' },
+  infoBox: { flex: 1, backgroundColor: '#121214', borderWidth: 1, borderColor: '#34343a', borderRadius: 14, padding: 12 },
+  btn: { minHeight: 46, backgroundColor: '#f4a621', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 23, alignItems: 'center', justifyContent: 'center', flexGrow: 1 }, btnText: { color: '#fff', fontWeight: '900', fontSize: 13 }, btn_blue: { backgroundColor: '#f4a621' }, btn_red: { backgroundColor: '#8d3040' }, btn_green: { backgroundColor: '#168a62' }, btn_yellow: { backgroundColor: '#f5c44d' }, btn_gray: { backgroundColor: '#303034' }, btn_coral: { backgroundColor: '#ff5a47' }, btn_light: { backgroundColor: '#f5f5f6' }, disabled: { opacity: 0.55 }, dark: { color: '#121214' },
+  chips: { gap: 8, marginBottom: 10 }, chip: { minHeight: 44, backgroundColor: '#121214', borderWidth: 1, borderColor: '#34343a', borderRadius: 999, paddingHorizontal: 12, justifyContent: 'center' }, chipText: { color: '#ffc65c', fontWeight: '900', fontSize: 12 },
+  header: { flexDirection: 'row', gap: 10, justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }, badge: { backgroundColor: '#121214', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: '#34343a' }, badgeText: { color: '#10b981', fontWeight: '900' }, classImage: { width: '100%', height: 145, borderRadius: 14, marginBottom: 10, backgroundColor: '#121214' },
+  box: { marginTop: 12, padding: 12, borderRadius: 14, backgroundColor: '#121214', borderWidth: 1, borderColor: '#34343a' }, student: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' }, avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#f4a621', alignItems: 'center', justifyContent: 'center' }, avatarAnonymous: { backgroundColor: '#52525b' }, avatarText: { color: '#19120a', fontWeight: '900' }, userImg: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#f4a621', alignItems: 'center', justifyContent: 'center' },
 
-  compactMenu: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, paddingVertical: 8, backgroundColor: '#101010', borderBottomWidth: 1, borderBottomColor: '#242424' },
-  menuButton: { flex: 1, backgroundColor: '#1e293b', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: '#334155' },
+  compactMenu: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, paddingVertical: 8, backgroundColor: '#09090b', borderBottomWidth: 1, borderBottomColor: '#242424' },
+  menuButton: { flex: 1, backgroundColor: '#1c1c1f', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: '#34343a' },
   menuButtonText: { color: '#fff', fontWeight: '900' },
-  refreshButton: { backgroundColor: '#334155', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, alignItems: 'center', justifyContent: 'center' },
-  refreshText: { color: '#bfdbfe', fontWeight: '900', fontSize: 12 },
+  refreshButton: { backgroundColor: '#34343a', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, alignItems: 'center', justifyContent: 'center' },
+  refreshText: { color: '#ffc65c', fontWeight: '900', fontSize: 12 },
   actionBar: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'flex-end', paddingHorizontal: 10 },
   backdropPressable: { ...StyleSheet.absoluteFillObject },
-  sheet: { maxHeight: '84%', backgroundColor: '#0f172a', borderRadius: 24, borderWidth: 1, borderColor: '#334155', overflow: 'hidden' },
+  sheet: { maxHeight: '84%', backgroundColor: '#121214', borderRadius: 24, borderWidth: 1, borderColor: '#34343a', overflow: 'hidden' },
   sheetCompact: { maxHeight: '58%' },
   sheetHandle: { width: 44, height: 5, borderRadius: 999, backgroundColor: '#475569', alignSelf: 'center', marginTop: 10, marginBottom: 2 },
   sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#1f2937' },
   sheetTitle: { color: '#fff', fontSize: 18, fontWeight: '900' },
-  closeButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#1e293b', alignItems: 'center', justifyContent: 'center' },
+  closeButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#1c1c1f', alignItems: 'center', justifyContent: 'center' },
   closeText: { color: '#fff', fontWeight: '900', fontSize: 16 },
   sheetBody: { padding: 14 },
-  menuItem: { backgroundColor: '#1e293b', borderRadius: 14, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
-  menuItemActive: { backgroundColor: '#2563eb', borderColor: '#60a5fa' },
-  menuText: { color: '#cbd5e1', fontWeight: '900' },
-  menuTextActive: { color: '#fff' },
+  menuItem: { backgroundColor: '#1c1c1f', borderRadius: 14, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  menuItemActive: { backgroundColor: '#f4a621', borderColor: '#ffc65c' },
+  menuText: { color: '#d4d4d8', fontWeight: '900' },
+  menuTextActive: { color: '#19120a' },
   notice: { position: 'absolute', left: 16, right: 16, backgroundColor: '#059669', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 14, elevation: 8 },
   noticeError: { backgroundColor: '#dc2626' },
   noticeText: { color: '#fff', fontWeight: '900', textAlign: 'center' },
-  tapHint: { color: '#bfdbfe', fontSize: 12, fontWeight: '900', marginTop: 8 },
-  pill: { alignSelf: 'flex-start', color: '#fff', backgroundColor: '#2563eb', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, marginTop: 8, overflow: 'hidden', fontWeight: '900', fontSize: 12 }, warning: { backgroundColor: 'rgba(217,119,6,0.16)', borderWidth: 1, borderColor: 'rgba(251,191,36,0.35)', borderRadius: 14, padding: 14, marginBottom: 14 }, warnTitle: { color: '#fbbf24', fontWeight: '900', marginBottom: 4 }, unread: { borderColor: '#38bdf8', backgroundColor: 'rgba(14,116,144,0.22)' }, metric: { backgroundColor: 'rgba(16,185,129,0.12)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.25)', borderRadius: 16, padding: 14, marginBottom: 10 },
+  tapHint: { color: '#ffc65c', fontSize: 12, fontWeight: '900', marginTop: 8 },
+  pill: { alignSelf: 'flex-start', color: '#19120a', backgroundColor: '#f4a621', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, marginTop: 8, overflow: 'hidden', fontWeight: '900', fontSize: 12 }, warning: { backgroundColor: 'rgba(217,119,6,0.16)', borderWidth: 1, borderColor: 'rgba(251,191,36,0.35)', borderRadius: 14, padding: 14, marginBottom: 14 }, warnTitle: { color: '#fbbf24', fontWeight: '900', marginBottom: 4 }, unread: { borderColor: '#f4a621', backgroundColor: 'rgba(244,166,33,0.12)' }, metric: { backgroundColor: 'rgba(16,185,129,0.12)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.25)', borderRadius: 16, padding: 14, marginBottom: 10 },
   activityActions: { flexDirection: 'row', gap: 8, marginTop: 14, marginBottom: 16 },
   filterLabel: { color: '#f4f4f5', fontSize: 13, fontWeight: '900', textTransform: 'uppercase', marginBottom: 8 },
   filterOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 },
   activitiesLoading: { minHeight: 150, alignItems: 'center', justifyContent: 'center', gap: 10 },
   activitiesLoadingText: { color: '#9a9a9f', fontSize: 14, fontWeight: '700' },
   typeImageTypes: { gap: 10, paddingBottom: 14 },
-  typeImageType: { width: 132, minHeight: 116, backgroundColor: '#101820', borderWidth: 2, borderColor: '#334155', borderRadius: 14, padding: 8 },
-  typeImageTypeActive: { borderColor: '#ff5a47', backgroundColor: '#2a1d1b' },
-  typeImageThumb: { width: '100%', height: 68, borderRadius: 9, backgroundColor: '#020617' },
-  typeImageThumbEmpty: { width: '100%', height: 68, borderRadius: 9, backgroundColor: '#020617', alignItems: 'center', justifyContent: 'center' },
-  typeImageThumbText: { color: '#64748b', fontSize: 11, fontWeight: '800' },
+  typeImageType: { width: 132, minHeight: 116, backgroundColor: '#101820', borderWidth: 2, borderColor: '#34343a', borderRadius: 14, padding: 8 },
+  typeImageTypeActive: { borderColor: '#f4a621', backgroundColor: '#2a2112' },
+  typeImageThumb: { width: '100%', height: 68, borderRadius: 9, backgroundColor: '#09090b' },
+  typeImageThumbEmpty: { width: '100%', height: 68, borderRadius: 9, backgroundColor: '#09090b', alignItems: 'center', justifyContent: 'center' },
+  typeImageThumbText: { color: '#71717a', fontSize: 11, fontWeight: '800' },
   typeImageTypeName: { color: '#f8fafc', fontSize: 12, lineHeight: 16, fontWeight: '900', marginTop: 7 },
-  typeImageEditor: { borderTopWidth: 1, borderTopColor: '#334155', paddingTop: 14 },
-  typeImagePreview: { width: '100%', height: 190, borderRadius: 14, backgroundColor: '#020617' },
+  typeImageEditor: { borderTopWidth: 1, borderTopColor: '#34343a', paddingTop: 14 },
+  typeImagePreview: { width: '100%', height: 190, borderRadius: 14, backgroundColor: '#09090b' },
   typeImagePreviewEmpty: { alignItems: 'center', justifyContent: 'center', padding: 18 },
-  typeImageFile: { color: '#cbd5e1', fontSize: 12, lineHeight: 18, marginTop: 8 },
-  typeImageFeedback: { color: '#cbd5e1', fontSize: 13, lineHeight: 19, marginTop: 12, padding: 11, borderRadius: 10, backgroundColor: '#172033' },
+  typeImageFile: { color: '#d4d4d8', fontSize: 12, lineHeight: 18, marginTop: 8 },
+  typeImageFeedback: { color: '#d4d4d8', fontSize: 13, lineHeight: 19, marginTop: 12, padding: 11, borderRadius: 10, backgroundColor: '#172033' },
   typeImageFeedbackError: { color: '#fecaca', backgroundColor: '#401b24' },
   typeImageFeedbackSuccess: { color: '#bbf7d0', backgroundColor: '#133529' }
 });

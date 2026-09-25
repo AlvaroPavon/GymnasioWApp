@@ -120,7 +120,7 @@ export default function CreateUserModal({ isOpen, onClose, onUpdate, onSuccess }
         >
           <button onClick={handleClose} className="absolute top-4 right-4 text-slate-400 hover:text-white w-8 h-8 flex items-center justify-center bg-slate-800 rounded-full pb-1">x</button>
 
-          <h2 className="text-2xl font-bold mb-6 text-blue-500">Alta de Nuevo Miembro</h2>
+          <h2 className="text-2xl font-bold mb-6 text-amber-500">Alta de Nuevo Miembro</h2>
 
           <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
@@ -135,7 +135,7 @@ export default function CreateUserModal({ isOpen, onClose, onUpdate, onSuccess }
                   </div>
                   <canvas ref={canvasRef} className="hidden"></canvas>
                   <div className="flex gap-4 w-full justify-center">
-                    <button type="button" onClick={capturePhoto} disabled={isCapturing} className="bg-gym-accent hover:bg-green-500 text-black font-bold py-2 px-6 rounded shadow-lg transition-colors">
+                    <button type="button" onClick={capturePhoto} disabled={isCapturing} className="bg-amber-400 hover:bg-amber-300 text-[#19120a] font-bold py-2 px-6 rounded shadow-lg shadow-amber-500/10 transition-colors">
                       {isCapturing ? 'Procesando...' : '📸 Tomar Foto'}
                     </button>
                     <button type="button" onClick={stopCamera} className="bg-slate-700 hover:bg-red-500 text-white font-bold py-2 px-6 rounded transition-colors">
@@ -158,7 +158,7 @@ export default function CreateUserModal({ isOpen, onClose, onUpdate, onSuccess }
                       <div className="w-20 h-20 rounded-full mx-auto bg-slate-800 flex items-center justify-center text-3xl">👤</div>
                       <p className="text-xs text-slate-400">Sin foto. Usa la cámara de la recepción o sube un archivo.</p>
                       <div className="flex gap-2 justify-center mt-2">
-                        <button type="button" onClick={startCamera} className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-2 px-4 rounded transition-colors">
+                        <button type="button" onClick={startCamera} className="bg-amber-500 hover:bg-amber-400 text-white text-xs font-bold py-2 px-4 rounded transition-colors">
                           📷 Usar Cámara
                         </button>
                         <label className="bg-slate-700 hover:bg-slate-600 cursor-pointer text-white text-xs font-bold py-2 px-4 rounded transition-colors">
@@ -225,7 +225,7 @@ export default function CreateUserModal({ isOpen, onClose, onUpdate, onSuccess }
             </div>
             )}
 
-            <button type="submit" disabled={loading || isCameraActive} className="md:col-span-2 mt-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold p-3 rounded-lg shadow-lg transition-colors">
+            <button type="submit" disabled={loading || isCameraActive} className="md:col-span-2 mt-2 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-white font-bold p-3 rounded-lg shadow-lg transition-colors">
               {loading ? 'Subiendo datos y foto...' : 'Dar de Alta Inmediata'}
             </button>
           </form>

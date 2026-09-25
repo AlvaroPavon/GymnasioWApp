@@ -1,7 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  AccessibilityInfo,
   Alert,
+  Animated,
+  Easing,
   Keyboard,
   Image,
   KeyboardAvoidingView,
@@ -15,6 +18,7 @@ import {
   View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { ArrowRight, EnvelopeSimple, Eye, EyeSlash, LockKey } from "phosphor-react-native";
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from "expo-notifications";
@@ -26,6 +30,7 @@ import {
 } from "../src/auth/session";
 import { classReminderEnabled } from "../src/utils/activityCalendar";
 import { openPrivacyPolicy } from "../src/utils/privacyPolicy";
+import { COLORS, RADII } from "../src/theme";
 
 const brandLogo = require("../assets/logo.jpg");
 const COPYRIGHT_TEXT = "Creada por Álvaro Pavón. Derechos reservados.";
@@ -40,13 +45,29 @@ const normalizeEmail = (value) => value.trim().toLowerCase();
 
 export default function LoginScreen({ navigation }) {
   const passwordInputRef = useRef(null);
+  const entrance = useRef(new Animated.Value(0)).current;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [reduceMotion, setReduceMotion] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [checkingSession, setCheckingSession] = useState(true);
   const [loginLoading, setLoginLoading] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (active) setReduceMotion(enabled);
+    });
+    const subscription = AccessibilityInfo.addEventListener("reduceMotionChanged", setReduceMotion);
+
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, []);
 
   useEffect(() => {
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
@@ -126,6 +147,23 @@ export default function LoginScreen({ navigation }) {
     };
   }, [navigation]);
 
+  useEffect(() => {
+    if (checkingSession) return undefined;
+    if (reduceMotion) {
+      entrance.stopAnimation();
+      entrance.setValue(1);
+      return undefined;
+    }
+    const animation = Animated.timing(entrance, {
+      toValue: 1,
+      duration: 520,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [checkingSession, entrance, reduceMotion]);
+
   const registerPushToken = async (accessToken) => {
     try {
       const permission = await Notifications.requestPermissionsAsync();
@@ -187,7 +225,7 @@ export default function LoginScreen({ navigation }) {
   if (checkingSession) {
     return (
       <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
-        <ActivityIndicator size="large" color="#60a5fa" />
+        <ActivityIndicator size="large" color={COLORS.gold} />
         <Text style={styles.loadingText}>Comprobando sesión...</Text>
       </SafeAreaView>
     );
@@ -195,6 +233,7 @@ export default function LoginScreen({ navigation }) {
 
   const KeyboardContainer = Platform.OS === "ios" ? KeyboardAvoidingView : View;
   const keyboardCompact = keyboardVisible || inputFocused;
+  const cardTranslateY = entrance.interpolate({ inputRange: [0, 1], outputRange: [24, 0] });
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
@@ -211,53 +250,76 @@ export default function LoginScreen({ navigation }) {
             keyboardCompact && styles.scrollContentKeyboard
           ]}
         >
-          <View style={[styles.card, keyboardCompact && styles.cardKeyboard]}>
-            <Image source={brandLogo} style={[styles.logo, keyboardCompact && styles.logoKeyboard]} resizeMode="contain" />
-            <Text style={[styles.title, keyboardCompact && styles.titleKeyboard]}>Ronquillo Te Cuida</Text>
-            <Text style={[styles.subtitle, keyboardCompact && styles.subtitleKeyboard]}>Acceso móvil</Text>
+          <Animated.View style={[styles.card, keyboardCompact && styles.cardKeyboard, { opacity: entrance, transform: [{ translateY: cardTranslateY }] }]}>
+            <View style={[styles.logoFrame, keyboardCompact && styles.logoFrameKeyboard]}>
+              <Image source={brandLogo} style={[styles.logo, keyboardCompact && styles.logoKeyboard]} resizeMode="contain" />
+            </View>
+            <Text style={styles.eyebrow}>ACCESO SEGURO</Text>
+            <Text style={[styles.title, keyboardCompact && styles.titleKeyboard]}>Bienvenido de nuevo</Text>
+            <Text style={[styles.subtitle, keyboardCompact && styles.subtitleKeyboard]}>Gestiona tus clases y reservas</Text>
 
-            <TextInput
-              style={[styles.input, keyboardCompact && styles.inputKeyboard]}
-              placeholder="Email"
-              placeholderTextColor="#64748b"
-              keyboardType="email-address"
-              inputMode="email"
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoComplete="email"
-              textContentType="username"
-              returnKeyType="next"
-              value={email}
-              onChangeText={setEmail}
-              onFocus={() => setInputFocused(true)}
-              onBlur={() => setInputFocused(false)}
-              onSubmitEditing={() => passwordInputRef.current?.focus()}
-            />
-            <TextInput
-              ref={passwordInputRef}
-              style={[styles.input, keyboardCompact && styles.inputKeyboard]}
-              placeholder="Contraseña"
-              placeholderTextColor="#64748b"
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoComplete="current-password"
-              textContentType="password"
-              returnKeyType="done"
-              value={password}
-              onChangeText={setPassword}
-              onFocus={() => setInputFocused(true)}
-              onBlur={() => setInputFocused(false)}
-              onSubmitEditing={handleLogin}
-            />
+            <Text style={styles.inputLabel}>EMAIL</Text>
+            <View style={[styles.inputShell, keyboardCompact && styles.inputShellKeyboard]}>
+              <EnvelopeSimple size={20} color={COLORS.gold} weight="bold" />
+              <TextInput
+                style={styles.input}
+                placeholder="tu@email.com"
+                placeholderTextColor={COLORS.textMuted}
+                keyboardType="email-address"
+                inputMode="email"
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="email"
+                textContentType="username"
+                returnKeyType="next"
+                value={email}
+                onChangeText={setEmail}
+                onFocus={() => setInputFocused(true)}
+                onBlur={() => setInputFocused(false)}
+                onSubmitEditing={() => passwordInputRef.current?.focus()}
+              />
+            </View>
+
+            <Text style={styles.inputLabel}>CONTRASEÑA</Text>
+            <View style={[styles.inputShell, keyboardCompact && styles.inputShellKeyboard]}>
+              <LockKey size={20} color={COLORS.gold} weight="bold" />
+              <TextInput
+                ref={passwordInputRef}
+                style={styles.input}
+                placeholder="Tu contraseña"
+                placeholderTextColor={COLORS.textMuted}
+                secureTextEntry={!passwordVisible}
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="current-password"
+                textContentType="password"
+                returnKeyType="done"
+                value={password}
+                onChangeText={setPassword}
+                onFocus={() => setInputFocused(true)}
+                onBlur={() => setInputFocused(false)}
+                onSubmitEditing={handleLogin}
+              />
+              <TouchableOpacity
+                accessibilityLabel={passwordVisible ? "Ocultar contraseña" : "Mostrar contraseña"}
+                accessibilityRole="button"
+                hitSlop={8}
+                onPress={() => setPasswordVisible((visible) => !visible)}
+                style={styles.visibilityButton}
+              >
+                {passwordVisible
+                  ? <EyeSlash size={20} color={COLORS.textSecondary} weight="bold" />
+                  : <Eye size={20} color={COLORS.textSecondary} weight="bold" />}
+              </TouchableOpacity>
+            </View>
 
             <View style={[styles.rememberRow, keyboardCompact && styles.rememberRowKeyboard]}>
               <Text style={styles.rememberText}>Recordarme en este dispositivo</Text>
               <Switch
                 value={rememberMe}
                 onValueChange={setRememberMe}
-                trackColor={{ false: "#334155", true: "#2563eb" }}
-                thumbColor={rememberMe ? "#bfdbfe" : "#94a3b8"}
+                trackColor={{ false: COLORS.elevated, true: COLORS.gold }}
+                thumbColor={rememberMe ? "#fff7e6" : COLORS.textSecondary}
               />
             </View>
 
@@ -268,6 +330,7 @@ export default function LoginScreen({ navigation }) {
               activeOpacity={0.86}
             >
               <Text style={styles.buttonText}>{loginLoading ? "Entrando..." : "Ingresar"}</Text>
+              {!loginLoading ? <ArrowRight size={20} color="#19120a" weight="bold" /> : null}
             </TouchableOpacity>
             <Text style={[styles.copyrightText, keyboardCompact && styles.copyrightTextKeyboard]}>
               {COPYRIGHT_TEXT}
@@ -277,7 +340,7 @@ export default function LoginScreen({ navigation }) {
                 {"Pol\u00edtica de privacidad"}
               </Text>
             </TouchableOpacity>
-          </View>
+          </Animated.View>
         </ScrollView>
       </KeyboardContainer>
     </SafeAreaView>
@@ -285,110 +348,112 @@ export default function LoginScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#020617", justifyContent: "center" },
+  container: { flex: 1, backgroundColor: COLORS.background, justifyContent: "center" },
   keyboard: { flex: 1 },
   scrollContent: {
     flexGrow: 1,
     justifyContent: "center",
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingVertical: 18
   },
   scrollContentKeyboard: {
     justifyContent: "flex-start",
-    paddingHorizontal: 18,
-    paddingTop: 10,
+    paddingHorizontal: 14,
+    paddingTop: 8,
     paddingBottom: 12
   },
   card: {
-    backgroundColor: "rgba(30, 41, 59, 0.7)",
-    padding: 28,
-    borderRadius: 24,
+    backgroundColor: "rgba(24,24,27,0.97)",
+    padding: 22,
+    borderRadius: RADII.xl,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)"
+    borderColor: COLORS.borderStrong,
+    shadowColor: "#000",
+    shadowOpacity: 0.38,
+    shadowRadius: 26,
+    shadowOffset: { width: 0, height: 14 },
+    elevation: 10
   },
-  cardKeyboard: {
-    padding: 14,
-    borderRadius: 20
-  },
+  cardKeyboard: { padding: 14, borderRadius: RADII.large },
+  logoFrame: { width: "100%", height: 126, borderRadius: RADII.large, marginBottom: 19, backgroundColor: "#fff", padding: 7, overflow: "hidden" },
+  logoFrameKeyboard: { height: 70, marginBottom: 9, borderRadius: RADII.medium },
   logo: {
     width: "100%",
-    height: 132,
-    borderRadius: 18,
-    marginBottom: 20,
+    height: "100%",
+    borderRadius: RADII.medium,
     backgroundColor: "#ffffff"
   },
-  logoKeyboard: {
-    height: 64,
-    marginBottom: 8,
-    borderRadius: 14
-  },
+  logoKeyboard: { borderRadius: RADII.small },
+  eyebrow: { color: COLORS.gold, fontSize: 10, lineHeight: 14, fontWeight: "900", letterSpacing: 1.8, marginBottom: 4 },
   title: {
-    fontSize: 31,
+    fontSize: 29,
+    lineHeight: 34,
     fontWeight: "900",
-    color: "#60a5fa",
-    textAlign: "center",
-    marginBottom: 6,
-    letterSpacing: -1
+    color: COLORS.text,
+    marginBottom: 4,
+    letterSpacing: -0.9
   },
-  titleKeyboard: {
-    fontSize: 22,
-    marginBottom: 2
-  },
-  subtitle: { color: "#94a3b8", textAlign: "center", marginBottom: 32, fontSize: 16 },
-  subtitleKeyboard: { marginBottom: 12, fontSize: 13 },
-  input: {
-    backgroundColor: "#0f172a",
-    color: "#f8fafc",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    fontSize: 16,
+  titleKeyboard: { fontSize: 22, lineHeight: 26, marginBottom: 1 },
+  subtitle: { color: COLORS.textSecondary, marginBottom: 24, fontSize: 14, lineHeight: 20, fontWeight: "600" },
+  subtitleKeyboard: { marginBottom: 10, fontSize: 12 },
+  inputLabel: { color: COLORS.textSecondary, fontSize: 10, fontWeight: "900", letterSpacing: 1.2, marginBottom: 6 },
+  inputShell: {
+    minHeight: 54,
+    backgroundColor: COLORS.background,
     borderWidth: 1,
-    borderColor: "#334155"
-  },
-  inputKeyboard: {
-    padding: 12,
-    marginBottom: 10,
-    fontSize: 15
-  },
-  loadingText: { color: "#94a3b8", marginTop: 14, fontWeight: "800", textAlign: "center" },
-  rememberRow: {
-    backgroundColor: "#0f172a",
-    borderWidth: 1,
-    borderColor: "#334155",
-    borderRadius: 12,
+    borderColor: COLORS.borderStrong,
+    borderRadius: RADII.medium,
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    marginBottom: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10
+  },
+  inputShellKeyboard: { minHeight: 46, marginBottom: 9 },
+  input: { flex: 1, minWidth: 0, color: COLORS.text, paddingVertical: 12, fontSize: 15, fontWeight: "700" },
+  visibilityButton: { width: 34, height: 34, alignItems: "center", justifyContent: "center", borderRadius: 12 },
+  loadingText: { color: COLORS.textSecondary, marginTop: 14, fontWeight: "800", textAlign: "center" },
+  rememberRow: {
+    backgroundColor: COLORS.background,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: RADII.medium,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     marginBottom: 8,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center"
   },
   rememberRowKeyboard: { paddingVertical: 8, marginBottom: 4 },
-  rememberText: { color: "#e2e8f0", fontWeight: "800", flex: 1, paddingRight: 12 },
+  rememberText: { color: COLORS.textSecondary, fontSize: 12, fontWeight: "800", flex: 1, paddingRight: 12 },
   button: {
-    backgroundColor: "#2563eb",
-    padding: 18,
-    borderRadius: 12,
+    minHeight: 54,
+    backgroundColor: COLORS.gold,
+    paddingHorizontal: 18,
+    borderRadius: RADII.medium,
     alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
     marginTop: 12,
-    shadowColor: "#3b82f6",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 5
+    shadowColor: COLORS.gold,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.24,
+    shadowRadius: 14,
+    elevation: 6
   },
-  buttonKeyboard: { padding: 14, marginTop: 8 },
+  buttonKeyboard: { minHeight: 48, marginTop: 6 },
   buttonDisabled: { opacity: 0.65 },
   buttonText: {
-    color: "white",
+    color: "#19120a",
     fontWeight: "900",
     fontSize: 16,
     textTransform: "uppercase",
     letterSpacing: 1
   },
   copyrightText: {
-    color: "#64748b",
+    color: COLORS.textMuted,
     fontSize: 11,
     fontWeight: "700",
     marginTop: 18,
@@ -399,7 +464,7 @@ const styles = StyleSheet.create({
     marginTop: 10
   },
   privacyLinkText: {
-    color: "#94a3b8",
+    color: COLORS.textSecondary,
     fontSize: 11,
     fontWeight: "800",
     marginTop: 6,

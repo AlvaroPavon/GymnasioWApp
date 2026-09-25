@@ -47,15 +47,15 @@ export default function TeacherPanel({ siteName, onUserClick, realtimeVersion = 
 
   return (
     <div className="space-y-6">
-      <section className="glass flex flex-col items-start justify-between gap-4 rounded-xl p-5 sm:flex-row sm:items-center" aria-labelledby="teacher-schedule-heading">
+      <section className="glass flex flex-col items-start justify-between gap-4 rounded-[1.5rem] p-5 sm:flex-row sm:items-center" aria-labelledby="teacher-schedule-heading">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-300">Programación</p>
-          <h2 id="teacher-schedule-heading" className="text-xl font-bold text-white">Gestiona tus clases</h2>
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-[#f4a621]">Programación</p>
+          <h2 id="teacher-schedule-heading" className="text-xl font-black tracking-[-.025em] text-white">Gestiona tus clases</h2>
         </div>
         <button
           type="button"
           onClick={() => setIsCreateClassOpen(true)}
-          className="rounded-lg bg-emerald-400 px-5 py-3 font-bold text-slate-950 shadow-lg transition-colors hover:bg-emerald-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
+          className="gold-button rounded-2xl px-5 py-3 text-sm font-black uppercase tracking-[.06em] transition-transform hover:-translate-y-0.5"
         >
           Crear clase
         </button>

@@ -11,7 +11,7 @@ Ancla del proyecto. Antes de continuar en otro turno, revisá este mapa para no 
 - **Jobs**: `node-cron`.
 - **Push**: `expo-server-sdk` en API y `expo-notifications` en mobile.
 - **Web**: React 19 + Vite 8 + TailwindCSS 4.
-- **Mobile**: Expo SDK `57.0.24` + React Native `0.86.3` + React `19.2.3`, con nueva arquitectura.
+- **Mobile**: Expo SDK `57.0.25` + React Native `0.86.3` + React `19.2.3`, con nueva arquitectura.
 - **Mobile release**: `app.config.js` dinámico + `eas.json` para builds/submits de App Store y Play Store.
 - **Tests**: Jest 30 + Supertest en API; `node:test` para lógica móvil aislada.
 
@@ -20,6 +20,7 @@ Ancla del proyecto. Antes de continuar en otro turno, revisá este mapa para no 
 ```txt
 GimnasioWapp/
 ├─ ARCHITECTURE_MAP.md
+├─ design-qa.md
 ├─ README.md
 ├─ docs/PRODUCTION_OPERATIONS.md
 ├─ docs/STORE_RELEASE.md
@@ -60,21 +61,27 @@ GimnasioWapp/
    ├─ app.config.js
    ├─ eas.json
    ├─ index.js
-   ├─ assets/{icon,adaptive-icon,notification-icon,splash}.png
+   ├─ assets/{icon,adaptive-icon,notification-icon,splash,splash-transparent}.png
+   ├─ assets/logo.jpg
    ├─ scripts/{validate-release-env,check-privacy-policy-link}.mjs
    ├─ store/privacy-policy-template.md
    ├─ src/api/{client.ts,config.js,realtime.js}
+   ├─ src/components/BrandSplash.js
    ├─ src/components/activities/ActivityCalendar.js
+   ├─ src/components/navigation/AnimatedTabDock.js
    ├─ src/notifications/registerPushToken.ts
    ├─ src/release/runWithEnv.mjs
    ├─ src/auth/session.js
    ├─ src/screens/DashboardScreen.js
+   ├─ src/theme.js
    ├─ src/utils/{activityCalendar,classSchedule,privacyPolicy,classTypeImageUpload}.js
    ├─ src/utils/activityCalendar.test.mjs
    └─ screens/{LoginScreen,DashboardScreen}.js
 ```
 
 `mobile/App.js` es el punto de composición real: mantiene `screens/LoginScreen.js` para login e importa el dashboard activo desde `src/screens/DashboardScreen.js`. `screens/DashboardScreen.js` queda como implementación histórica y no debe recibir nuevas funcionalidades.
+
+El sistema visual compartido usa fondo obsidiana, superficies carbón/navy, acento dorado y coral solo para estados destacados. Web respeta `prefers-reduced-motion` mediante `MotionConfig`; mobile usa un splash animado accesible y un dock inferior adaptado a safe areas. Las animaciones nunca deben cambiar la navegación ni ocultar funciones por rol.
 
 ## Modelos DB obligatorios
 

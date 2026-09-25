@@ -132,23 +132,23 @@ export default function CreateClassModal({ isOpen, onClose, onCreated, classType
             ref={closeButtonRef}
             type="button"
             onClick={onClose}
-            className="absolute right-4 top-4 rounded-full bg-slate-800 px-3 py-2 text-xs font-bold text-slate-300 hover:text-white focus-visible:outline-2 focus-visible:outline-blue-400"
+            className="absolute right-4 top-4 rounded-full bg-slate-800 px-3 py-2 text-xs font-bold text-slate-300 hover:text-white focus-visible:outline-2 focus-visible:outline-amber-400"
           >
             Cerrar
           </button>
 
-          <h2 id="create-class-title" className="mb-2 text-2xl font-bold text-emerald-300">Crear clase</h2>
+          <h2 id="create-class-title" className="mb-2 text-2xl font-bold text-amber-300">Crear clase</h2>
           <p className="mb-5 pr-16 text-xs text-slate-500">La clase quedará asignada a tu perfil de profesor.</p>
 
           <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <label className="grid gap-1 text-xs text-slate-400 md:col-span-2">
               Título de la clase
-              <input type="text" required value={title} onChange={(event) => setTitle(event.target.value)} className="w-full rounded border border-slate-700 bg-slate-800 p-3 text-white focus-visible:outline-2 focus-visible:outline-blue-400" />
+              <input type="text" required value={title} onChange={(event) => setTitle(event.target.value)} className="w-full rounded border border-slate-700 bg-slate-800 p-3 text-white focus-visible:outline-2 focus-visible:outline-amber-400" />
             </label>
 
             <label className="grid gap-1 text-xs text-slate-400 md:col-span-2">
               Tipo de clase
-              <select value={classTypeId} onChange={(event) => setClassTypeId(event.target.value)} className="w-full rounded border border-slate-700 bg-slate-800 p-3 text-slate-300 focus-visible:outline-2 focus-visible:outline-blue-400">
+              <select value={classTypeId} onChange={(event) => setClassTypeId(event.target.value)} className="w-full rounded border border-slate-700 bg-slate-800 p-3 text-slate-300 focus-visible:outline-2 focus-visible:outline-amber-400">
                 <option value="">General automático</option>
                 {classTypes.map((type) => <option key={type.id} value={type.id}>{type.name || type.nombre}</option>)}
               </select>
@@ -156,26 +156,26 @@ export default function CreateClassModal({ isOpen, onClose, onCreated, classType
 
             <label className="grid gap-1 text-xs text-slate-400 md:col-span-2">
               Capacidad máxima
-              <input type="number" min="1" required value={maxCapacity} onChange={(event) => setMaxCapacity(event.target.value)} className="w-full rounded border border-slate-700 bg-slate-800 p-3 text-white focus-visible:outline-2 focus-visible:outline-blue-400" />
+              <input type="number" min="1" required value={maxCapacity} onChange={(event) => setMaxCapacity(event.target.value)} className="w-full rounded border border-slate-700 bg-slate-800 p-3 text-white focus-visible:outline-2 focus-visible:outline-amber-400" />
             </label>
 
             <label className="grid gap-1 text-xs text-slate-400 md:col-span-2">
               Repetición semanal
-              <input type="number" min="1" max="52" required value={repeatWeeks} onChange={(event) => setRepeatWeeks(event.target.value)} className="w-full rounded border border-slate-700 bg-slate-800 p-3 text-white focus-visible:outline-2 focus-visible:outline-blue-400" />
+              <input type="number" min="1" max="52" required value={repeatWeeks} onChange={(event) => setRepeatWeeks(event.target.value)} className="w-full rounded border border-slate-700 bg-slate-800 p-3 text-white focus-visible:outline-2 focus-visible:outline-amber-400" />
               <span className="text-[11px] text-slate-500">1 crea solo esta clase; un valor mayor repite el mismo horario cada semana.</span>
             </label>
 
             <label className="grid gap-1 text-xs text-slate-400">
               Inicio
-              <input type="datetime-local" required value={startTime} onChange={(event) => setStartTime(event.target.value)} className="w-full rounded border border-slate-700 bg-slate-800 p-3 text-white focus-visible:outline-2 focus-visible:outline-blue-400" />
+              <input type="datetime-local" required value={startTime} onChange={(event) => setStartTime(event.target.value)} className="w-full rounded border border-slate-700 bg-slate-800 p-3 text-white focus-visible:outline-2 focus-visible:outline-amber-400" />
             </label>
             <label className="grid gap-1 text-xs text-slate-400">
               Fin
-              <input type="datetime-local" required value={endTime} onChange={(event) => setEndTime(event.target.value)} className="w-full rounded border border-slate-700 bg-slate-800 p-3 text-white focus-visible:outline-2 focus-visible:outline-blue-400" />
+              <input type="datetime-local" required value={endTime} onChange={(event) => setEndTime(event.target.value)} className="w-full rounded border border-slate-700 bg-slate-800 p-3 text-white focus-visible:outline-2 focus-visible:outline-amber-400" />
             </label>
 
             <fieldset className="rounded-xl border border-slate-700 bg-slate-950/50 p-3 md:col-span-2">
-              <legend className="px-2 text-xs font-bold text-emerald-300">Alumnos fijos</legend>
+              <legend className="px-2 text-xs font-bold text-amber-300">Alumnos fijos</legend>
               <p className="mb-3 text-[11px] text-slate-500">Se reservarán automáticamente en todas las semanas creadas.</p>
               {clientsLoading ? (
                 <p className="text-xs text-slate-400">Cargando alumnos…</p>
@@ -198,7 +198,7 @@ export default function CreateClassModal({ isOpen, onClose, onCreated, classType
               )}
             </fieldset>
 
-            <button type="submit" disabled={loading} className="mt-3 rounded-lg bg-emerald-400 p-3 font-bold text-slate-950 shadow-lg transition-colors hover:bg-emerald-300 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-400 md:col-span-2">
+            <button type="submit" disabled={loading} className="mt-3 rounded-lg bg-gradient-to-r from-amber-300 to-amber-500 p-3 font-bold text-[#19120a] shadow-lg shadow-amber-500/10 transition-all hover:from-amber-200 hover:to-amber-400 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-amber-400 md:col-span-2">
               {loading ? 'Creando…' : Number(repeatWeeks) > 1 ? `Crear ${repeatWeeks} clases` : 'Crear clase'}
             </button>
           </form>

@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { Bell, CalendarDots, ChartBar, ImageSquare, SlidersHorizontal, UsersThree } from '@phosphor-icons/react';
+import { motion } from 'framer-motion';
 import EditClassModal from './EditClassModal';
 import CreateUserModal from './CreateUserModal';
 import ClassDetailsModal from './ClassDetailsModal';
@@ -8,6 +10,15 @@ import ClassTypeImageManager from './activities/ClassTypeImageManager';
 import { useAuth } from '../context/AuthContext';
 import { API_URL, getApiErrorMessage } from '../lib/api';
 import { buildClassCreatePayload, selectedClassById } from '../lib/classPayload';
+
+const ADMIN_NAV = [
+  { id: 'classes', label: 'Clases', description: 'Agenda y aforo', icon: CalendarDots },
+  { id: 'users', label: 'Usuarios', description: 'Directorio', icon: UsersThree },
+  { id: 'images', label: 'Imágenes', description: 'Tipos de actividad', icon: ImageSquare },
+  { id: 'stats', label: 'Métricas', description: 'Rendimiento', icon: ChartBar },
+  { id: 'payments', label: 'Pagos', description: 'Cuotas y avisos', icon: Bell },
+  { id: 'settings', label: 'Ajustes', description: 'Personalización', icon: SlidersHorizontal }
+];
 
 export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 }) {
   const { user: currentUser } = useAuth();
@@ -308,71 +319,64 @@ export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 
   return (
     <div className="flex flex-col lg:flex-row gap-8 animate-fade-in pb-10">
 
-      {/* NAVEGACIÓN LATERAL (SIDEBAR) */}
-      <div className="w-full lg:w-72 flex-shrink-0">
-        <div className="glass rounded-2xl p-6 sticky top-28 border-t border-l border-white/10">
-          <h2 className="text-sm font-bold text-amber-500 uppercase tracking-widest mb-6">Administración</h2>
-          <div className="flex flex-col gap-3">
-            <button
-              onClick={() => setTab('classes')}
-              className={`text-left px-5 py-3 rounded-xl font-bold transition-all w-full flex items-center justify-between ${tab === 'classes' ? 'bg-blue-600 text-white shadow-[0_4px_15px_rgba(37,99,235,0.3)]' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
-            >
-              <span>Gestión de Clases</span>
-              {tab === 'classes' && <span className="w-2 h-2 rounded-full bg-white"></span>}
-            </button>
-            <button
-              onClick={() => setTab('users')}
-              className={`text-left px-5 py-3 rounded-xl font-bold transition-all w-full flex items-center justify-between ${tab === 'users' ? 'bg-blue-600 text-white shadow-[0_4px_15px_rgba(37,99,235,0.3)]' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
-            >
-              <span>Directorio Usuarios</span>
-              {tab === 'users' && <span className="w-2 h-2 rounded-full bg-white"></span>}
-            </button>
-            <button
-              onClick={() => setTab('images')}
-              className={`text-left px-5 py-3 rounded-xl font-bold transition-all w-full flex items-center justify-between ${tab === 'images' ? 'bg-blue-600 text-white shadow-[0_4px_15px_rgba(37,99,235,0.3)]' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
-            >
-              <span>Imágenes de Actividad</span>
-              {tab === 'images' && <span className="w-2 h-2 rounded-full bg-white"></span>}
-            </button>
-
-            <div className="h-px bg-white/10 my-2"></div>
-
-            <button
-              onClick={() => setTab('stats')}
-              className={`text-left px-5 py-3 rounded-xl font-bold transition-all w-full flex items-center justify-between ${tab === 'stats' ? 'bg-emerald-500 text-slate-900 shadow-[0_4px_15px_rgba(16,185,129,0.3)]' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
-            >
-              <span>Métricas BI</span>
-              {tab === 'stats' && <span className="w-2 h-2 rounded-full bg-slate-900"></span>}
-            </button>
-            <button
-              onClick={() => setTab('payments')}
-              className={`text-left px-5 py-3 rounded-xl font-bold transition-all w-full flex items-center justify-between ${tab === 'payments' ? 'bg-cyan-500 text-slate-900 shadow-[0_4px_15px_rgba(6,182,212,0.3)]' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
-            >
-              <span>Pagos & Avisos</span>
-              <span className={`text-xs px-2 py-1 rounded-full ${unreadNotifications.length > 0 ? 'bg-red-500 text-white' : 'bg-slate-800 text-slate-400'}`}>
-                {unreadNotifications.length}
-              </span>
-            </button>
-            <button
-              onClick={() => setTab('settings')}
-              className={`text-left px-5 py-3 rounded-xl font-bold transition-all w-full flex items-center justify-between ${tab === 'settings' ? 'bg-amber-500 text-slate-900 shadow-[0_4px_15px_rgba(245,158,11,0.3)]' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
-            >
-              <span>Personalización</span>
-              {tab === 'settings' && <span className="w-2 h-2 rounded-full bg-slate-900"></span>}
-            </button>
+      <aside className="w-full flex-shrink-0 lg:w-72" aria-label="Navegación de administración">
+        <div className="nav-surface sticky top-28 rounded-[1.7rem] p-3">
+          <div className="mb-3 px-3 pb-2 pt-3">
+            <p className="text-[10px] font-black uppercase tracking-[.2em] text-[#f4a621]">Administración</p>
+            <h2 className="mt-1 text-xl font-black tracking-[-.03em] text-white">Centro de control</h2>
           </div>
+          <nav className="grid grid-cols-2 gap-2 lg:grid-cols-1">
+            {ADMIN_NAV.map(({ id, label, description, icon: Icon }) => {
+              const active = tab === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setTab(id)}
+                  className={`relative flex min-h-16 items-center gap-3 overflow-hidden rounded-2xl px-3 text-left transition-colors ${active ? 'text-[#19120a]' : 'text-zinc-400 hover:bg-white/[.045] hover:text-white'}`}
+                  aria-current={active ? 'page' : undefined}
+                >
+                  {active && (
+                    <motion.span
+                      layoutId="admin-active-tab"
+                      className="absolute inset-0 bg-gradient-to-r from-[#ffd36e] to-[#f4a621] shadow-[0_10px_28px_rgba(244,166,33,.22)]"
+                      transition={{ type: 'spring', stiffness: 340, damping: 30 }}
+                    />
+                  )}
+                  <span className={`relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${active ? 'bg-black/10' : 'bg-white/[.045]'}`}>
+                    <Icon size={21} weight={active ? 'fill' : 'duotone'} aria-hidden="true" />
+                  </span>
+                  <span className="relative z-10 min-w-0 flex-1">
+                    <span className="block truncate text-sm font-black">{label}</span>
+                    <span className={`hidden truncate text-[10px] font-bold lg:block ${active ? 'text-black/60' : 'text-zinc-600'}`}>{description}</span>
+                  </span>
+                  {id === 'payments' && unreadNotifications.length > 0 && (
+                    <span className="relative z-10 flex h-6 min-w-6 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-black text-white">
+                      {unreadNotifications.length}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </nav>
         </div>
-      </div>
+      </aside>
 
       {/* ÁREA DE CONTENIDO PRINCIPAL */}
-      <div className="flex-1 min-w-0 glass rounded-2xl p-6 relative border-t border-white/5 min-h-[500px]">
+      <motion.div
+        key={tab}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.26 }}
+        className="glass relative min-h-[500px] min-w-0 flex-1 rounded-[1.7rem] p-4 sm:p-6"
+      >
 
       {/* VIEW: CLASES */}
       {tab === 'classes' && (
         <div className="space-y-8">
           <section className="glass rounded-xl p-6" aria-labelledby="create-class-heading">
             <div className="mb-5">
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-300">Programación</p>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-amber-300">Programación</p>
               <h2 id="create-class-heading" className="text-2xl font-bold text-white">Crear nueva clase</h2>
             </div>
             <form onSubmit={createClass} className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -412,7 +416,7 @@ export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 
                 <input type="datetime-local" required value={endTime} onChange={event => setEndTime(event.target.value)} className="w-full bg-slate-900 border border-slate-700 p-3 rounded text-white" />
               </label>
               <fieldset className="rounded-xl border border-slate-700 bg-slate-950/50 p-4 md:col-span-2">
-                <legend className="px-2 text-xs font-bold text-emerald-300">Alumnos fijos</legend>
+                <legend className="px-2 text-xs font-bold text-amber-300">Alumnos fijos</legend>
                 <p className="mb-3 text-xs text-slate-500">Quedarán confirmados automáticamente en cada semana creada.</p>
                 {eligibleClients.length > 0 ? (
                   <div className="grid max-h-48 gap-2 overflow-y-auto pr-1 sm:grid-cols-2 lg:grid-cols-3">
@@ -432,7 +436,7 @@ export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 
                   <p className="text-xs text-slate-500">No hay clientes con cuota activa.</p>
                 )}
               </fieldset>
-              <button type="submit" className="md:col-span-2 bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold p-3 rounded-lg shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400">
+              <button type="submit" className="md:col-span-2 bg-gradient-to-r from-amber-300 to-amber-500 hover:from-amber-200 hover:to-amber-400 text-[#19120a] font-bold p-3 rounded-lg shadow-lg shadow-amber-500/10 transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400">
                 {Number(repeatWeeks) > 1 ? `Crear ${repeatWeeks} clases` : 'Crear clase'}
               </button>
             </form>
@@ -461,7 +465,7 @@ export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 
           </section>
 
           <section className="glass rounded-xl p-6">
-          <h2 className="text-2xl font-bold mb-2 text-purple-400">Banco de imágenes heredado</h2>
+          <h2 className="text-2xl font-bold mb-2 text-amber-300">Banco de imágenes heredado</h2>
           <p className="text-sm text-slate-400 mb-5">Conserva las reglas por palabra clave para clases antiguas que todavía no tengan imagen de tipo.</p>
           <form onSubmit={async (e) => {
             e.preventDefault();
@@ -471,7 +475,7 @@ export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 
           }} className="flex flex-col sm:flex-row gap-4 mb-6">
             <input name="kw" type="text" placeholder="Keyword (ej. yoga)" required className="flex-1 bg-slate-900 border border-slate-700 p-3 rounded" />
             <input name="url" type="url" placeholder="https://unsplash..." required className="flex-[2] bg-slate-900 border border-slate-700 p-3 rounded" />
-            <button type="submit" className="bg-purple-600 hover:bg-purple-500 font-bold p-3 rounded-lg text-white shadow">Añadir Master Image</button>
+            <button type="submit" className="bg-amber-500 hover:bg-amber-400 font-bold p-3 rounded-lg text-slate-950 shadow shadow-amber-500/10">Añadir imagen</button>
           </form>
 
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
@@ -496,7 +500,7 @@ export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 
             <h2 className="text-2xl font-bold text-gym-accent">Directorio de Usuarios</h2>
             <button
               onClick={() => setIsCreateUserOpen(true)}
-              className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded-lg shadow-lg transition-colors flex items-center gap-2"
+              className="bg-amber-500 hover:bg-amber-400 text-white font-bold py-2 px-4 rounded-lg shadow-lg transition-colors flex items-center gap-2"
             >
               <span>+</span> Nuevo Usuario
             </button>
@@ -520,7 +524,7 @@ export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 
                   <td className="py-3 font-semibold">{u.name}</td>
                   <td className="py-3 text-slate-400">{u.email}</td>
                   <td className="py-3">
-                    <span className={`px-2 py-1 rounded text-xs font-bold ${u.role==='ADMIN'?'bg-red-500/20 text-red-500':u.role==='TEACHER'?'bg-blue-500/20 text-blue-500':'bg-gym-highlight/20 text-gym-highlight'}`}>
+                    <span className={`px-2 py-1 rounded text-xs font-bold ${u.role==='ADMIN'?'bg-red-500/20 text-red-500':u.role==='TEACHER'?'bg-amber-500/20 text-amber-500':'bg-gym-highlight/20 text-gym-highlight'}`}>
                       {u.role}
                     </span>
                   </td>
@@ -534,7 +538,7 @@ export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 
                   </td>
                   <td className="py-3 text-slate-400 text-sm">{u.created_at ? new Date(u.created_at).toLocaleDateString() : '-'}</td>
                   <td className="py-3 flex gap-2">
-                    <button onClick={() => onUserClick(u)} className="bg-blue-500/20 text-blue-400 px-3 py-1 rounded hover:bg-blue-500 hover:text-white transition-colors">Editar</button>
+                    <button onClick={() => onUserClick(u)} className="bg-amber-500/20 text-amber-400 px-3 py-1 rounded hover:bg-amber-400 hover:text-white transition-colors">Editar</button>
                     <button onClick={() => openPasswordReset(u)} className="bg-amber-500/20 text-amber-300 px-3 py-1 rounded hover:bg-amber-500 hover:text-slate-950 transition-colors">Cambiar contraseña</button>
                     {u.role === 'CLIENT' && (
                       <button onClick={() => renewMembership(u.id)} className="bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded hover:bg-emerald-500 hover:text-white transition-colors">Renovar</button>
@@ -554,7 +558,7 @@ export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 
 
           {/* Rentabilidad por Categoría */}
           <section className="glass rounded-xl p-6 overflow-x-auto">
-            <h2 className="text-2xl font-bold mb-4 text-green-400">Rentabilidad por Categoría (Histórico Acumulado)</h2>
+            <h2 className="text-2xl font-bold mb-4 text-amber-300">Rentabilidad por Categoría (Histórico Acumulado)</h2>
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-white/10 text-slate-400">
@@ -591,12 +595,12 @@ export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 
           {/* Control de Horas del Profesor */}
           <section className="glass rounded-xl p-6 overflow-x-auto">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-blue-400">Control de Horas del Profesor</h2>
+              <h2 className="text-2xl font-bold text-amber-400">Control de Horas del Profesor</h2>
               <input
                 type="month"
                 value={filterMonth}
                 onChange={e => setFilterMonth(e.target.value)}
-                className="bg-slate-900 border border-slate-700 p-2 rounded-lg text-white font-bold focus:outline-none focus:border-blue-500"
+                className="bg-slate-900 border border-slate-700 p-2 rounded-lg text-white font-bold focus:outline-none focus:border-amber-500"
               />
             </div>
 
@@ -614,7 +618,7 @@ export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 
                 {teacherStats.map((st, i) => (
                   <tr key={i} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                     <td className="py-3 font-bold text-white">{st.name}</td>
-                    <td className="py-3 text-blue-400 font-extrabold">{st.hours.toFixed(1)} h</td>
+                    <td className="py-3 text-amber-400 font-extrabold">{st.hours.toFixed(1)} h</td>
                     <td className="py-3 text-slate-400">{st.classesCount} módulos terminados</td>
                     <td className="py-3 text-slate-400">{st.attendeesCount} asientos</td>
                   </tr>
@@ -630,7 +634,7 @@ export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 
       {tab === 'payments' && (
         <div className="space-y-8">
           <section className="glass rounded-xl p-6 overflow-x-auto">
-            <h2 className="text-2xl font-bold mb-4 text-cyan-400">Pagos Pendientes de Revisión</h2>
+            <h2 className="text-2xl font-bold mb-4 text-amber-300">Pagos Pendientes de Revisión</h2>
             {pendingPayments.length === 0 ? (
               <p className="text-slate-500">No hay pagos pendientes.</p>
             ) : (
@@ -734,7 +738,7 @@ export default function AdminPanel({ siteName, onUserClick, realtimeVersion = 0 
         </section>
       )}
 
-      </div>
+      </motion.div>
 
       <EditClassModal
         isOpen={!!selectedClassToEdit}

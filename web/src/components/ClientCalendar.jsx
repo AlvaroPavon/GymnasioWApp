@@ -97,23 +97,23 @@ export default function ClientCalendar({
   return (
     <div className="space-y-6">
       {!membershipActive && (
-        <div className="glass border border-amber-500/30 rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3" role="status">
+        <div className="glass flex flex-col items-start justify-between gap-3 rounded-[1.5rem] border border-amber-500/30 p-4 md:flex-row md:items-center" role="status">
           <div>
             <p className="text-amber-300 font-bold">Tu cuota no está activa</p>
             <p className="text-slate-400 text-sm">Puedes consultar las actividades, pero no reservar hasta renovar la fecha de validez.</p>
           </div>
-          <button onClick={handleReportPayment} className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400">
+          <button onClick={handleReportPayment} className="gold-button rounded-2xl px-4 py-2 text-sm font-black">
             Notificar pago
           </button>
         </div>
       )}
 
-      <label className="glass flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 p-4">
+      <label className="glass flex cursor-pointer items-start gap-3 rounded-[1.5rem] border border-white/10 p-4 transition-colors hover:border-[#f4a621]/25">
         <input
           type="checkbox"
           checked={hideNameOnReserve}
           onChange={(event) => updateHideNameDefault(event.target.checked)}
-          className="mt-1 h-5 w-5 accent-emerald-400"
+          className="mt-1 h-5 w-5 accent-[#f4a621]"
         />
         <span>
           <span className="block font-bold text-white">Ocultar mi nombre al reservar</span>

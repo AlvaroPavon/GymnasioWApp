@@ -5,7 +5,7 @@
   --activities-border: rgba(255, 255, 255, 0.09);
   --activities-muted: #989aa1;
   --activities-text: #f7f7f8;
-  --activities-accent: #ff5c45;
+  --activities-accent: #f4a621;
   color: var(--activities-text);
   background: var(--activities-bg);
   border: 1px solid var(--activities-border);
@@ -84,7 +84,7 @@
   cursor: pointer;
 }
 .filter-control summary::-webkit-details-marker { display: none; }
-.filter-control[open] summary { border-color: rgba(255, 92, 69, 0.65); }
+.filter-control[open] summary { border-color: rgba(244, 166, 33, 0.72); }
 .filter-panel {
   position: absolute;
   z-index: 20;
@@ -204,7 +204,7 @@
   text-align: left;
   cursor: pointer;
 }
-.activity-card__title:hover { color: #ff8b79; }
+.activity-card__title:hover { color: #ffc65c; }
 .activity-card__time { flex: 0 0 auto; color: #fff; font-size: 0.88rem; font-weight: 850; white-space: nowrap; }
 .activity-card__meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; margin: 1.15rem 0; }
 .activity-card__meta div { min-width: 0; }
@@ -245,7 +245,7 @@
 
 .class-type-images { color: #f7f7f8; }
 .class-type-images__heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; margin-bottom: 1.25rem; }
-.class-type-images__heading p { margin: 0 0 0.35rem; color: #ff806d; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
+.class-type-images__heading p { margin: 0 0 0.35rem; color: #f4a621; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
 .class-type-images__heading h2 { margin: 0; font-size: clamp(1.65rem, 3vw, 2.35rem); letter-spacing: -0.035em; }
 .class-type-images__heading > span { color: #8e9096; font-size: 0.75rem; }
 .class-type-images__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
@@ -266,7 +266,7 @@
 
 .activities-shell :is(button, select, summary, input):focus-visible,
 .class-type-images :is(button, input):focus-visible {
-  outline: 3px solid rgba(96, 165, 250, 0.9);
+  outline: 3px solid rgba(244, 166, 33, 0.9);
   outline-offset: 3px;
 }
 

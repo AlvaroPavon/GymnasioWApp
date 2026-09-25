@@ -1,21 +1,26 @@
-import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import React, { useCallback, useState } from 'react';
+import { DarkTheme, NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import LoginScreen from './screens/LoginScreen';
 import DashboardScreen from './src/screens/DashboardScreen';
+import BrandSplash from './src/components/BrandSplash';
 
 const Stack = createNativeStackNavigator();
 
 export default function App() {
+  const [showBrandSplash, setShowBrandSplash] = useState(true);
+  const finishBrandSplash = useCallback(() => setShowBrandSplash(false), []);
+
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <NavigationContainer theme={{ ...DarkTheme, colors: { ...DarkTheme.colors, primary: '#f4a621', background: '#09090b', card: '#141416', text: '#fafafa', border: '#2a2a2e', notification: '#ff6848' } }}>
+        <Stack.Navigator screenOptions={{ headerShown: false, animation: 'fade', contentStyle: { backgroundColor: '#09090b' } }}>
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Dashboard" component={DashboardScreen} />
         </Stack.Navigator>
       </NavigationContainer>
+      {showBrandSplash ? <BrandSplash onFinished={finishBrandSplash} /> : null}
     </SafeAreaProvider>
   );
 }

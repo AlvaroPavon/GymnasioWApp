@@ -33,10 +33,9 @@
         "APP_NAME": "Ronquillo Te Cuida",
         "APP_SLUG": "ronquillotecuida",
         "APP_SCHEME": "ronquillotecuida",
-        "APP_VERSION": "1.0.1",
+        "APP_VERSION": "1.0.2",
         "ANDROID_PACKAGE": "com.azrael.ronquillotecuida",
-        "IOS_BUNDLE_IDENTIFIER": "com.azrael.ronquillotecuida",
-        "ANDROID_VERSION_CODE": "1"
+        "IOS_BUNDLE_IDENTIFIER": "com.azrael.ronquillotecuida"
       },
       "android": {
         "buildType": "app-bundle"
@@ -53,10 +52,9 @@
         "APP_NAME": "Ronquillo Te Cuida",
         "APP_SLUG": "ronquillotecuida",
         "APP_SCHEME": "ronquillotecuida",
-        "APP_VERSION": "1.0.1",
+        "APP_VERSION": "1.0.2",
         "ANDROID_PACKAGE": "com.azrael.ronquillotecuida",
-        "IOS_BUNDLE_IDENTIFIER": "com.azrael.ronquillotecuida",
-        "ANDROID_VERSION_CODE": "1"
+        "IOS_BUNDLE_IDENTIFIER": "com.azrael.ronquillotecuida"
       },
       "ios": {
         "simulator": false,

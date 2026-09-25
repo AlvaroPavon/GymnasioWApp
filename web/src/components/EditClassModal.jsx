@@ -115,22 +115,22 @@ export default function EditClassModal({ isOpen, onClose, classData, onUpdate, u
           exit={{ scale: 0.95, opacity: 0 }}
           className="relative z-10 w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl"
         >
-          <button ref={closeButtonRef} type="button" onClick={onClose} className="absolute right-4 top-4 rounded-full bg-slate-800 px-3 py-2 text-xs font-bold text-slate-300 hover:text-white focus-visible:outline-2 focus-visible:outline-blue-400">
+          <button ref={closeButtonRef} type="button" onClick={onClose} className="absolute right-4 top-4 rounded-full bg-slate-800 px-3 py-2 text-xs font-bold text-slate-300 hover:text-white focus-visible:outline-2 focus-visible:outline-amber-400">
             Cerrar
           </button>
 
-          <h2 id="edit-class-title" className="mb-2 text-2xl font-bold text-blue-300">Editar clase</h2>
+          <h2 id="edit-class-title" className="mb-2 text-2xl font-bold text-amber-300">Editar clase</h2>
           <p className="mb-5 pr-16 text-xs text-slate-500">La imagen del tipo de actividad se usa salvo que definas una URL específica para esta clase.</p>
 
           <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <label className="grid gap-1 text-xs text-slate-400 md:col-span-2">
               Título de la clase
-              <input type="text" required value={title} onChange={(event) => setTitle(event.target.value)} className="w-full rounded border border-slate-700 bg-slate-800 p-3 text-white focus-visible:outline-2 focus-visible:outline-blue-400" />
+              <input type="text" required value={title} onChange={(event) => setTitle(event.target.value)} className="w-full rounded border border-slate-700 bg-slate-800 p-3 text-white focus-visible:outline-2 focus-visible:outline-amber-400" />
             </label>
 
             <label className="grid gap-1 text-xs text-slate-400 md:col-span-2">
               Tipo de clase
-              <select value={classTypeId} onChange={(event) => setClassTypeId(event.target.value)} className="w-full rounded border border-slate-700 bg-slate-800 p-3 text-slate-300 focus-visible:outline-2 focus-visible:outline-blue-400">
+              <select value={classTypeId} onChange={(event) => setClassTypeId(event.target.value)} className="w-full rounded border border-slate-700 bg-slate-800 p-3 text-slate-300 focus-visible:outline-2 focus-visible:outline-amber-400">
                 <option value="">General automático</option>
                 {classTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
               </select>
@@ -139,7 +139,7 @@ export default function EditClassModal({ isOpen, onClose, classData, onUpdate, u
             {user.role === 'ADMIN' && (
               <label className="grid gap-1 text-xs text-slate-400 md:col-span-2">
                 Profesor
-                <select required value={teacherId} onChange={(event) => setTeacherId(event.target.value)} className="w-full rounded border border-slate-700 bg-slate-800 p-3 text-slate-300 focus-visible:outline-2 focus-visible:outline-blue-400">
+                <select required value={teacherId} onChange={(event) => setTeacherId(event.target.value)} className="w-full rounded border border-slate-700 bg-slate-800 p-3 text-slate-300 focus-visible:outline-2 focus-visible:outline-amber-400">
                   <option value="">Selecciona un profesor</option>
                   {teachers.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.name}</option>)}
                 </select>
@@ -148,7 +148,7 @@ export default function EditClassModal({ isOpen, onClose, classData, onUpdate, u
 
             <label className="grid gap-1 text-xs text-slate-400 md:col-span-2">
               Capacidad máxima
-              <input type="number" min="1" required value={maxCapacity} onChange={(event) => setMaxCapacity(event.target.value)} className="w-full rounded border border-slate-700 bg-slate-800 p-3 text-white focus-visible:outline-2 focus-visible:outline-blue-400" />
+              <input type="number" min="1" required value={maxCapacity} onChange={(event) => setMaxCapacity(event.target.value)} className="w-full rounded border border-slate-700 bg-slate-800 p-3 text-white focus-visible:outline-2 focus-visible:outline-amber-400" />
             </label>
 
             <label className="grid gap-1 text-xs text-slate-400 md:col-span-2">
@@ -158,21 +158,21 @@ export default function EditClassModal({ isOpen, onClose, classData, onUpdate, u
                 value={imageOverride.value}
                 onChange={(event) => setImageOverride((current) => ({ ...current, value: event.target.value, dirty: true }))}
                 placeholder="https://ejemplo.com/imagen.jpg"
-                className="w-full rounded border border-slate-700 bg-slate-800 p-3 text-white focus-visible:outline-2 focus-visible:outline-blue-400"
+                className="w-full rounded border border-slate-700 bg-slate-800 p-3 text-white focus-visible:outline-2 focus-visible:outline-amber-400"
               />
               <span className="text-[11px] text-slate-500">Borrá la URL para volver a usar la imagen del tipo de actividad.</span>
             </label>
 
             <label className="grid gap-1 text-xs text-slate-400">
               Inicio
-              <input type="datetime-local" step="0.001" required value={startTime} onChange={(event) => setStartTime(event.target.value)} className="w-full rounded border border-slate-700 bg-slate-800 p-3 text-white focus-visible:outline-2 focus-visible:outline-blue-400" />
+              <input type="datetime-local" step="0.001" required value={startTime} onChange={(event) => setStartTime(event.target.value)} className="w-full rounded border border-slate-700 bg-slate-800 p-3 text-white focus-visible:outline-2 focus-visible:outline-amber-400" />
             </label>
             <label className="grid gap-1 text-xs text-slate-400">
               Fin
-              <input type="datetime-local" step="0.001" required value={endTime} onChange={(event) => setEndTime(event.target.value)} className="w-full rounded border border-slate-700 bg-slate-800 p-3 text-white focus-visible:outline-2 focus-visible:outline-blue-400" />
+              <input type="datetime-local" step="0.001" required value={endTime} onChange={(event) => setEndTime(event.target.value)} className="w-full rounded border border-slate-700 bg-slate-800 p-3 text-white focus-visible:outline-2 focus-visible:outline-amber-400" />
             </label>
 
-            <button type="submit" disabled={loading} className="mt-3 rounded-lg bg-emerald-400 p-3 font-bold text-slate-950 shadow-lg transition-colors hover:bg-emerald-300 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-400 md:col-span-2">
+            <button type="submit" disabled={loading} className="mt-3 rounded-lg bg-gradient-to-r from-amber-300 to-amber-500 p-3 font-bold text-[#19120a] shadow-lg shadow-amber-500/10 transition-all hover:from-amber-200 hover:to-amber-400 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-amber-400 md:col-span-2">
               {loading ? 'Guardando…' : 'Guardar cambios'}
             </button>
           </form>

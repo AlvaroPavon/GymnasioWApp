@@ -266,13 +266,13 @@ export default function UserProfileModal({ isOpen, onClose, viewUser = null }) {
                   type="file"
                   accept="image/*"
                   onChange={(e) => setSelectedFile(e.target.files[0])}
-                  className="w-full bg-slate-900 border border-slate-700 text-slate-200 p-2 rounded-lg text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-gym-accent file:text-white hover:file:bg-blue-600"
+                  className="w-full bg-slate-900 border border-slate-700 text-slate-200 p-2 rounded-lg text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-gym-accent file:text-white hover:file:bg-amber-500"
                 />
               </div>
               <button
                 onClick={handleUpdate}
                 disabled={loading}
-                className="w-full bg-gym-accent hover:bg-blue-600 disabled:opacity-50 font-bold p-3 rounded-lg text-white transition-colors"
+                className="w-full bg-gym-accent hover:bg-amber-500 disabled:opacity-50 font-bold p-3 rounded-lg text-white transition-colors"
               >
                 {loading ? 'Guardando...' : 'Guardar Cambios'}
               </button>
