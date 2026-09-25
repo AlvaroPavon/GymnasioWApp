@@ -40,8 +40,8 @@ export class MembershipService {
       const notification = await tx.adminNotification.create({
         data: {
           type: "PAYMENT_REPORTED",
-          title: "Membership payment reported",
-          message: `${user.name} reported a membership payment. Review and confirm it to renew access.`,
+          title: "Pago de mensualidad notificado",
+          message: `${user.name} ha notificado un pago. Revísalo y confírmalo para renovar su acceso.`,
           userId,
           paymentId: payment.id
         }
@@ -135,7 +135,7 @@ export class MembershipService {
         data: {
           userId,
           amountCents: input.amountCents,
-          notes: input.notes ?? "Manual renewal by admin",
+          notes: input.notes ?? "Renovación manual realizada por un administrador",
           status: "CONFIRMED",
           reviewedById: adminId,
           reviewedAt: new Date(),
@@ -167,8 +167,8 @@ export class MembershipService {
       await tx.adminNotification.createMany({
         data: users.map((user) => ({
           type: "MEMBERSHIP_EXPIRED",
-          title: "Membership expired",
-          message: `${user.name}'s membership expired. Reservations are blocked until payment is renewed.`,
+          title: "Mensualidad caducada",
+          message: `La mensualidad de ${user.name} ha caducado. No podrá reservar hasta que se renueve el pago.`,
           userId: user.id
         }))
       });

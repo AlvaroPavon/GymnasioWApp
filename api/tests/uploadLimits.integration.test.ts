@@ -32,7 +32,7 @@ describe("Upload limit errors", () => {
     expect(response.status).toBe(400);
     expect(response.body.error).toEqual({
       code: "IMAGE_TOO_LARGE",
-      message: `Image exceeds the ${megabytes} MB limit`
+      message: `La imagen supera el límite de ${megabytes} MB.`
     });
   });
 });

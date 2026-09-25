@@ -13,7 +13,7 @@ const imageBody = z.object({
   imageUrl: z.string().url().optional(),
   image_url: z.string().url().optional()
 }).strict().refine((value) => value.imageUrl || value.image_url, {
-  message: "imageUrl is required",
+  message: "La URL de la imagen es obligatoria.",
   path: ["imageUrl"]
 });
 

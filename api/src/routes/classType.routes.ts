@@ -25,7 +25,7 @@ const classTypeBody = z.object({
   name: z.string().trim().min(2).max(80).optional(),
   nombre: z.string().trim().min(2).max(80).optional()
 }).strict().refine((value) => value.name || value.nombre, {
-  message: "name is required",
+  message: "El nombre es obligatorio.",
   path: ["name"]
 });
 
@@ -66,15 +66,34 @@ router.get("/", authenticate, asyncHandler(async (req, res) => {
   res.json(classTypes.map((classType) => classTypeDto(classType, (value) => absolutePublicUrl(req, value))));
 }));
 
-router.post("/", authenticate, requireRoles("ADMIN"), validate({ body: classTypeBody }), asyncHandler(async (req, res) => {
-  const body = req.body as z.infer<typeof classTypeBody>;
-  const name = (body.name ?? body.nombre)!.trim();
-  const exists = await prisma.classType.findUnique({ where: { name } });
-  if (exists) throw new AppError(409, "CLASS_TYPE_ALREADY_EXISTS", "Class type already exists");
+router.post(
+  "/",
+  authenticate,
+  requireRoles("ADMIN"),
+  uploadClassTypeImage.single("image"),
+  asyncHandler(async (req, res) => {
+    const body = classTypeBody.parse(req.body);
+    const name = (body.name ?? body.nombre)!.trim();
+    const exists = await prisma.classType.findUnique({ where: { name } });
+    if (exists) throw new AppError(409, "CLASS_TYPE_ALREADY_EXISTS", "Class type already exists");
 
-  const classType = await prisma.classType.create({ data: { name } });
-  res.status(201).json(classTypeDto(classType, (value) => absolutePublicUrl(req, value)));
-}));
+    let persistedImageUrl: string | undefined;
+    let databaseUpdated = false;
+    try {
+      persistedImageUrl = req.file ? await persistClassTypeImage(req.file) : undefined;
+      const classType = await prisma.classType.create({
+        data: { name, imageUrl: persistedImageUrl }
+      });
+      databaseUpdated = true;
+      res.status(201).json(classTypeDto(classType, (value) => absolutePublicUrl(req, value)));
+    } catch (error) {
+      if (persistedImageUrl && !databaseUpdated) {
+        await deleteLocalClassTypeImage(persistedImageUrl).catch(() => undefined);
+      }
+      throw error;
+    }
+  })
+);
 
 router.put(
   "/:id",

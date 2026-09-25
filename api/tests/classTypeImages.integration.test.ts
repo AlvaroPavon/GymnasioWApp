@@ -69,6 +69,50 @@ describe("Class type images", () => {
       .resolves.toMatchObject({ imageUrl: null });
   });
 
+  it("creates a class-type catalog entry with its image and applies it to new classes", async () => {
+    const admin = await createUser({ email: "admin-create-type@test.local", role: "ADMIN" });
+    const teacher = await createUser({ email: "teacher-create-type@test.local", role: "TEACHER" });
+    const authorization = `Bearer ${tokenFor(admin)}`;
+
+    const createdType = await request(app)
+      .post("/api/class-types")
+      .set("Authorization", authorization)
+      .set("Host", "api.test")
+      .field("name", "Zumba")
+      .attach("image", tinyPng, { filename: "zumba.png", contentType: "image/png" });
+
+    expect(createdType.status).toBe(201);
+    expect(createdType.body).toMatchObject({ name: "Zumba", nombre: "Zumba" });
+    expect(createdType.body.image_url).toMatch(/^http:\/\/api\.test\/uploads\/class-types\/[a-f0-9-]+\.webp$/);
+
+    const storedType = await prisma.classType.findUniqueOrThrow({ where: { id: createdType.body.id } });
+    expect(storedType.imageUrl).toMatch(/^\/uploads\/class-types\/[a-f0-9-]+\.webp$/);
+    const storedImage = localPathFromUrl(storedType.imageUrl!);
+    createdFiles.add(storedImage);
+    expect(fs.existsSync(storedImage)).toBe(true);
+
+    const startsAt = addMinutes(new Date(), 120);
+    const createdClass = await request(app)
+      .post("/api/classes")
+      .set("Authorization", authorization)
+      .set("Host", "api.test")
+      .send({
+        title: "Zumba inicial",
+        classTypeId: createdType.body.id,
+        teacherId: teacher.id,
+        maxCapacity: 12,
+        startsAt: startsAt.toISOString(),
+        endsAt: addMinutes(startsAt, 60).toISOString()
+      });
+
+    expect(createdClass.status).toBe(201);
+    expect(createdClass.body).toMatchObject({
+      image_url: createdType.body.image_url,
+      effective_image_url: createdType.body.image_url,
+      image_override_url: null
+    });
+  });
+
   it("rejects unsupported types and malformed signature-prefixed image content", async () => {
     const admin = await createUser({ email: "admin-image@test.local", role: "ADMIN" });
     const classType = await prisma.classType.create({ data: { name: "Pilates" } });

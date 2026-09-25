@@ -169,8 +169,8 @@ export class ReservationService {
     for (const user of promoted) {
       try {
         await this.push.sendToUser(user.userId, {
-          title: "Class spot confirmed",
-          body: `A spot opened for ${user.classTitle}. Your reservation is now confirmed.`,
+          title: "Plaza confirmada",
+          body: `Se ha liberado una plaza para ${user.classTitle}. Tu reserva ya está confirmada.`,
           data: { classId: user.classId, type: "WAITLIST_PROMOTED" }
         });
       } catch (error) {
