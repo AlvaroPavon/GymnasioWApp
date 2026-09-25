@@ -4,7 +4,7 @@ import { COLORS, RADII } from '../theme';
 
 const brandLogo = require('../../assets/logo.jpg');
 
-export default function BrandSplash({ onFinished }) {
+export default function BrandSplash({ onFinished, onReady }) {
   const opacity = useRef(new Animated.Value(1)).current;
   const logoScale = useRef(new Animated.Value(0.82)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
@@ -75,6 +75,7 @@ export default function BrandSplash({ onFinished }) {
       accessibilityLabel="Iniciando Ronquillo Te Cuida"
       accessibilityViewIsModal
       importantForAccessibility="yes"
+      onLayout={onReady}
       style={styles.container}
     >
       <Animated.View style={[styles.content, { opacity }]}>

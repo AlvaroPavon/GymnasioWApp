@@ -2,15 +2,20 @@ import React, { useCallback, useState } from 'react';
 import { DarkTheme, NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import * as SplashScreen from 'expo-splash-screen';
 import LoginScreen from './screens/LoginScreen';
 import DashboardScreen from './src/screens/DashboardScreen';
 import BrandSplash from './src/components/BrandSplash';
 
 const Stack = createNativeStackNavigator();
+void SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function App() {
   const [showBrandSplash, setShowBrandSplash] = useState(true);
   const finishBrandSplash = useCallback(() => setShowBrandSplash(false), []);
+  const revealBrandSplash = useCallback(() => {
+    void SplashScreen.hideAsync().catch(() => {});
+  }, []);
 
   return (
     <SafeAreaProvider>
@@ -20,7 +25,7 @@ export default function App() {
           <Stack.Screen name="Dashboard" component={DashboardScreen} />
         </Stack.Navigator>
       </NavigationContainer>
-      {showBrandSplash ? <BrandSplash onFinished={finishBrandSplash} /> : null}
+      {showBrandSplash ? <BrandSplash onReady={revealBrandSplash} onFinished={finishBrandSplash} /> : null}
     </SafeAreaProvider>
   );
 }
