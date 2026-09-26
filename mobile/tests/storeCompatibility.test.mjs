@@ -48,7 +48,8 @@ test('keeps the native splash visible until the opaque brand surface is laid out
 
   assert.ok(preventIndex >= 0 && preventIndex < appComponentIndex);
   assert.match(appSource, /const revealBrandSplash = useCallback\(\(\) => \{\s*void SplashScreen\.hideAsync\(\)\.catch\(\(\) => \{\}\);\s*\}, \[\]\);/);
-  assert.match(appSource, /<BrandSplash onReady=\{revealBrandSplash\} onFinished=\{finishBrandSplash\} \/>/);
+  assert.match(appSource, /showBrandSplash \? \(\s*<BrandSplash onReady=\{revealBrandSplash\} onFinished=\{finishBrandSplash\} \/>\s*\) : \(\s*<NavigationContainer/);
+  assert.ok(appSource.indexOf('<BrandSplash') < appSource.indexOf('<NavigationContainer'));
   assert.match(brandSplashSource, /<View[\s\S]*onLayout=\{onReady\}[\s\S]*style=\{styles\.container\}/);
   assert.match(brandSplashSource, /container:\s*\{[\s\S]*StyleSheet\.absoluteFillObject[\s\S]*backgroundColor:\s*COLORS\.background/);
   assert.match(background || '', /^#[0-9a-fA-F]{6}$/);

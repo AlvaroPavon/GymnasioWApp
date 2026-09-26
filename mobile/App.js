@@ -18,14 +18,17 @@ export default function App() {
   }, []);
 
   return (
-    <SafeAreaProvider>
-      <NavigationContainer theme={{ ...DarkTheme, colors: { ...DarkTheme.colors, primary: '#ff5a47', background: '#09090b', card: '#141416', text: '#fafafa', border: '#2a2a2e', notification: '#ff5a47' } }}>
-        <Stack.Navigator screenOptions={{ headerShown: false, animation: 'fade', contentStyle: { backgroundColor: '#09090b' } }}>
-          <Stack.Screen name="Login" component={LoginScreen} />
-          <Stack.Screen name="Dashboard" component={DashboardScreen} />
-        </Stack.Navigator>
-      </NavigationContainer>
-      {showBrandSplash ? <BrandSplash onReady={revealBrandSplash} onFinished={finishBrandSplash} /> : null}
+    <SafeAreaProvider style={{ flex: 1, backgroundColor: '#09090b' }}>
+      {showBrandSplash ? (
+        <BrandSplash onReady={revealBrandSplash} onFinished={finishBrandSplash} />
+      ) : (
+        <NavigationContainer theme={{ ...DarkTheme, colors: { ...DarkTheme.colors, primary: '#ff5a47', background: '#09090b', card: '#141416', text: '#fafafa', border: '#2a2a2e', notification: '#ff5a47' } }}>
+          <Stack.Navigator screenOptions={{ headerShown: false, animation: 'fade', contentStyle: { backgroundColor: '#09090b' } }}>
+            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="Dashboard" component={DashboardScreen} />
+          </Stack.Navigator>
+        </NavigationContainer>
+      )}
     </SafeAreaProvider>
   );
 }
