@@ -51,6 +51,8 @@ test('keeps the native splash visible until the opaque brand surface is laid out
   assert.match(appSource, /showBrandSplash \? \(\s*<BrandSplash onReady=\{revealBrandSplash\} onFinished=\{finishBrandSplash\} \/>\s*\) : \(\s*<NavigationContainer/);
   assert.ok(appSource.indexOf('<BrandSplash') < appSource.indexOf('<NavigationContainer'));
   assert.match(brandSplashSource, /<View[\s\S]*onLayout=\{onReady\}[\s\S]*style=\{styles\.container\}/);
-  assert.match(brandSplashSource, /container:\s*\{[\s\S]*StyleSheet\.absoluteFillObject[\s\S]*backgroundColor:\s*COLORS\.background/);
+  assert.match(brandSplashSource, /container:\s*\{[\s\S]*flex:\s*1[\s\S]*width:\s*'100%'[\s\S]*backgroundColor:\s*COLORS\.background/);
+  assert.match(brandSplashSource, /content:\s*\{[\s\S]*flex:\s*1[\s\S]*justifyContent:\s*'center'/);
+  assert.doesNotMatch(brandSplashSource, /StyleSheet\.absoluteFillObject/);
   assert.match(background || '', /^#[0-9a-fA-F]{6}$/);
 });

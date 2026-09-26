@@ -96,8 +96,8 @@ export default function BrandSplash({ onFinished, onReady }) {
 
 const styles = StyleSheet.create({
   container: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 100,
+    flex: 1,
+    width: '100%',
     backgroundColor: COLORS.background,
   },
   content: {
